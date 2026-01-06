@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ViewState, ChatMessage, ModelProvider } from './types';
 import AuditView from './components/AuditView';
 import ImageView from './components/ImageView';
@@ -43,6 +43,7 @@ const App: React.FC = () => {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -69,6 +70,13 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (currentView === ViewState.CHAT) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory, currentView, isChatLoading]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -139,18 +147,18 @@ const App: React.FC = () => {
         return <ImageView session={session} onRequireLogin={requireLogin} modelProvider={modelProvider} />;
       case ViewState.CHAT:
         return (
-          <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+          <div className="flex flex-col h-full bg-slate-50 md:bg-white md:rounded-xl md:shadow-sm md:border md:border-slate-200 overflow-hidden absolute inset-0 md:relative">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
               {chatHistory.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`flex gap-3 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`flex gap-3 max-w-[85%] md:max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-indigo-600' : getBotIconColor()}`}>
                       {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
                     </div>
-                    <div className={`p-4 rounded-2xl text-sm ${
+                    <div className={`p-3 md:p-4 rounded-2xl text-sm leading-relaxed ${
                       msg.role === 'user' 
                         ? 'bg-indigo-600 text-white rounded-tr-none' 
                         : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
@@ -174,21 +182,26 @@ const App: React.FC = () => {
                    </div>
                 </div>
               )}
+              <div ref={chatEndRef} />
             </div>
-            <div className="p-4 bg-white border-t border-slate-200">
-              <form onSubmit={handleChatSubmit} className="flex gap-2">
+            
+            {/* Chat Input - Sticky Bottom */}
+            <div className="p-3 md:p-4 bg-white border-t border-slate-200 sticky bottom-0 left-0 right-0 z-10 pb-safe">
+              <form onSubmit={handleChatSubmit} className="flex gap-2 items-end">
                 <input
                   type="text"
-                  className="flex-1 border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder={session ? `Ask ${getBotName()} a question...` : "Log in to chat with the assistant..."}
+                  className="flex-1 border border-slate-300 bg-slate-50 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-base md:text-sm"
+                  placeholder={session ? `Ask ${getBotName()}...` : "Log in to chat..."}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={!session}
+                  // Prevent iOS zoom on focus
+                  style={{ fontSize: '16px' }} 
                 />
                 <button 
                   type="submit"
                   disabled={!chatInput.trim() || isChatLoading}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg transition-colors disabled:opacity-50"
+                  className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white p-3 rounded-full transition-all disabled:opacity-50 flex-shrink-0 shadow-sm"
                   title={!session ? "Login required" : "Send"}
                   onClick={(e) => {
                     if (!session) {
@@ -206,22 +219,22 @@ const App: React.FC = () => {
       case ViewState.DASHBOARD:
       default:
         return (
-          <div className="animate-fade-in space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="animate-fade-in space-y-6 md:space-y-8 pb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               <div 
                 onClick={() => setCurrentView(ViewState.AUDIT_TEXT)}
-                className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-6 rounded-2xl shadow-lg text-white cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all group"
+                className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 md:p-6 rounded-2xl shadow-lg text-white cursor-pointer hover:shadow-xl active:scale-95 transition-all group touch-manipulation"
               >
                 <div className="bg-white/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
                   <FileSearch className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">Analyze Data</h3>
-                <p className="text-indigo-100 text-sm">Paste CSV or financial text for instant anomaly detection and risk assessment.</p>
+                <p className="text-indigo-100 text-sm">Paste CSV or financial text for instant anomaly detection.</p>
               </div>
 
               <div 
                 onClick={() => setCurrentView(ViewState.AUDIT_IMAGE)}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+                className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:border-indigo-300 hover:shadow-md active:scale-95 transition-all group touch-manipulation"
               >
                 <div className="bg-emerald-50 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
                   <FileText className="w-6 h-6 text-emerald-600" />
@@ -232,17 +245,17 @@ const App: React.FC = () => {
 
               <div 
                 onClick={() => setCurrentView(ViewState.CHAT)}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+                className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:border-indigo-300 hover:shadow-md active:scale-95 transition-all group touch-manipulation"
               >
                 <div className="bg-blue-50 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
                   <MessageSquareText className="w-6 h-6 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">Consult Assistant</h3>
-                <p className="text-slate-500 text-sm">Chat with the AI about accounting standards, compliance, and regulations.</p>
+                <p className="text-slate-500 text-sm">Chat with the AI about accounting standards and compliance.</p>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                  <ShieldCheck className="w-8 h-8 text-indigo-600" />
                  <h2 className="text-2xl font-bold text-slate-800">Ready to Audit</h2>
@@ -253,14 +266,14 @@ const App: React.FC = () => {
               </p>
               
               {!session && (
-                 <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-between">
+                 <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-indigo-900">Sign in to get started</p>
-                      <p className="text-sm text-indigo-700">Authentication is required to use AI features.</p>
+                      <p className="font-semibold text-indigo-900 text-center sm:text-left">Sign in to get started</p>
+                      <p className="text-sm text-indigo-700 text-center sm:text-left">Authentication is required to use AI features.</p>
                     </div>
                     <button 
                       onClick={requireLogin}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                      className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors font-medium shadow-sm"
                     >
                       Sign In
                     </button>
@@ -274,70 +287,73 @@ const App: React.FC = () => {
 
   if (isLoadingSession) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="h-[100dvh] bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    // Use dvh (dynamic viewport height) for better mobile browser support
+    <div className="h-[100dvh] bg-slate-50 flex overflow-hidden">
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
       
+      {/* Mobile Menu Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden animate-fade-in"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0
       `}>
         <div className="p-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-white font-bold text-xl">
-             <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
-               <ShieldCheck className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 text-white font-bold text-xl">
+             <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+               <ShieldCheck className="w-6 h-6 text-white" />
              </div>
              AuditAI
           </div>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden">
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)} 
+            className="md:hidden p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <nav className="px-4 py-4 space-y-2">
-          <button 
-            onClick={() => { setCurrentView(ViewState.DASHBOARD); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${currentView === ViewState.DASHBOARD ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            Dashboard
-          </button>
-          <button 
-            onClick={() => { setCurrentView(ViewState.AUDIT_TEXT); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${currentView === ViewState.AUDIT_TEXT ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
-          >
-            <FileSearch className="w-5 h-5" />
-            Data Analysis
-          </button>
-          <button 
-            onClick={() => { setCurrentView(ViewState.AUDIT_IMAGE); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${currentView === ViewState.AUDIT_IMAGE ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
-          >
-            <ScanLine className="w-5 h-5" />
-            Document Scan
-          </button>
-          <button 
-            onClick={() => { setCurrentView(ViewState.CHAT); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${currentView === ViewState.CHAT ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
-          >
-            <MessageSquareText className="w-5 h-5" />
-            AI Assistant
-          </button>
+          {[
+            { view: ViewState.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
+            { view: ViewState.AUDIT_TEXT, icon: FileSearch, label: 'Data Analysis' },
+            { view: ViewState.AUDIT_IMAGE, icon: ScanLine, label: 'Document Scan' },
+            { view: ViewState.CHAT, icon: MessageSquareText, label: 'AI Assistant' },
+          ].map((item) => (
+            <button 
+              key={item.view}
+              onClick={() => { setCurrentView(item.view); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium ${
+                currentView === item.view 
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20 translate-x-1' 
+                  : 'hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </button>
+          ))}
         </nav>
 
-        <div className="absolute bottom-0 w-full p-6 border-t border-slate-800">
+        <div className="absolute bottom-0 w-full p-6 border-t border-slate-800 bg-slate-900">
           {session ? (
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-semibold">{session.user.email?.[0].toUpperCase() || 'U'}</span>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <span className="text-white font-semibold text-sm">{session.user.email?.[0].toUpperCase() || 'U'}</span>
                 </div>
                 <div className="min-w-0">
                   <p className="text-white text-sm font-medium truncate">{session.user.email?.split('@')[0] || 'Auditor'}</p>
@@ -346,7 +362,7 @@ const App: React.FC = () => {
               </div>
               <button 
                 onClick={handleLogout}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition-colors"
                 title="Sign Out"
               >
                 <LogOut className="w-5 h-5" />
@@ -355,7 +371,7 @@ const App: React.FC = () => {
           ) : (
             <button 
               onClick={requireLogin}
-              className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg transition-colors border border-slate-700"
+              className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3.5 rounded-xl transition-colors border border-slate-700 font-medium active:scale-95"
             >
               <LogIn className="w-4 h-4" />
               Sign In
@@ -365,42 +381,50 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-600">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-6 z-10 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)} 
+              className="md:hidden text-slate-600 p-2 -ml-2 hover:bg-slate-100 rounded-lg active:scale-90 transition-transform"
+            >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-bold text-slate-800 truncate max-w-[180px] sm:max-w-none">
               {currentView === ViewState.DASHBOARD && 'Overview'}
-              {currentView === ViewState.AUDIT_TEXT && 'Financial Data Audit'}
-              {currentView === ViewState.AUDIT_IMAGE && 'Document Forensic Audit'}
-              {currentView === ViewState.CHAT && 'Consultation Assistant'}
+              {currentView === ViewState.AUDIT_TEXT && 'Data Audit'}
+              {currentView === ViewState.AUDIT_IMAGE && 'Doc Audit'}
+              {currentView === ViewState.CHAT && 'AI Assistant'}
             </h1>
           </div>
           <div className="flex items-center gap-4">
             {/* Model Selector */}
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2 bg-slate-50 px-2 md:px-3 py-1.5 rounded-lg border border-slate-200">
               <Cpu className="w-4 h-4 text-slate-500" />
-              <span className="text-xs font-medium text-slate-500">Model:</span>
+              <span className="text-xs font-medium text-slate-500 hidden sm:inline">Model:</span>
               <select 
                 value={modelProvider}
                 onChange={(e) => setModelProvider(e.target.value as ModelProvider)}
-                className="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                className="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer max-w-[100px] sm:max-w-none"
               >
-                <option value="gemini">Gemini 3 Flash</option>
+                <option value="gemini">Gemini</option>
                 <option value="gpt">GPT-4o</option>
-                <option value="deepseek">DeepSeek V3</option>
-                <option value="qwen">Qwen Max</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="qwen">Qwen</option>
               </select>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-6 md:p-8">
-          <div className="max-w-6xl mx-auto">
-             {renderContent()}
-          </div>
+        {/* Content Area - Uses h-full relative to flex container */}
+        <div className="flex-1 overflow-auto relative w-full">
+          {currentView === ViewState.CHAT ? (
+            renderContent()
+          ) : (
+             <div className="p-4 md:p-8 max-w-6xl mx-auto min-h-full">
+               {renderContent()}
+             </div>
+          )}
         </div>
       </main>
     </div>
