@@ -2,6 +2,8 @@
 
 An intelligent financial audit assistant powered by Google Gemini and Supabase. Now supporting GPT-4o (OpenAI), DeepSeek, and Qwen (Alibaba).
 
+🌐 **Live Application:** [https://auditai.zhouyuaninfo.com/](https://auditai.zhouyuaninfo.com/)
+
 ## 🚀 Deployment on Vercel
 
 This project is configured to be easily deployed on [Vercel](https://vercel.com).
