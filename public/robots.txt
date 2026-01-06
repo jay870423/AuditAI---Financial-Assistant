@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://auditAi.zhouyuaninfo.com/sitemap.xml

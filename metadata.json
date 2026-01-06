@@ -1,0 +1,5 @@
+{
+  "name": "AuditAI - Financial Assistant",
+  "description": "An intelligent financial audit assistant powered by Gemini. Analyze financial statements, detect anomalies in transaction data, and audit receipts/invoices with visual analysis.",
+  "requestFramePermissions": []
+}
