@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://auditAi.zhouyuaninfo.com/sitemap.xml
+# Google Search Console does not support "Content-signal". 
+# If you want to control AI training, use standard User-agent disallows or HTML meta tags.
+
+Sitemap: https://auditai.zhouyuaninfo.com/sitemap.xml
