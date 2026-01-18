@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { AuditAnalysisResult, ChatMessage, ModelProvider } from "../types";
+import { AuditAnalysisResult, ChatMessage, ModelProvider, AuditScenario } from "../types";
 import { Language } from "../i18n";
 
 // Ensure we don't crash if env is missing during initial load
@@ -121,18 +122,33 @@ const getProviderConfig = (provider: ModelProvider, jsonMode: boolean = false): 
 };
 
 /**
+ * Gets specialized system instructions based on the scenario
+ */
+const getScenarioInstruction = (scenario: AuditScenario, langInstruction: string): string => {
+  const base = `You are a professional auditor. Output language: ${langInstruction}.`;
+  switch (scenario) {
+    case 'fraud':
+      return `${base} Focus heavily on FRAUD DETECTION. Look for round number anomalies, weekend transactions, duplicate payments, and Benford's Law violations. Be suspicious.`;
+    case 'tax':
+      return `${base} Focus on TAX COMPLIANCE. Identify non-deductible expenses, VAT/GST issues, and verify if transaction categories align with standard tax codes.`;
+    case 'compliance':
+      return `${base} Focus on INTERNAL CONTROLS and POLICY COMPLIANCE. Flag unauthorized spending patterns, split transactions (to avoid approval limits), and lack of descriptions.`;
+    case 'general':
+    default:
+      return `${base} Provide a balanced financial overview, identifying general anomalies and trends.`;
+  }
+};
+
+/**
  * Analyzes financial text or CSV data using Gemini, DeepSeek, GPT, or Qwen.
  */
-export const analyzeFinancialData = async (data: string, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<AuditAnalysisResult> => {
+export const analyzeFinancialData = async (data: string, provider: ModelProvider = 'gemini', language: Language = 'en', scenario: AuditScenario = 'general'): Promise<AuditAnalysisResult> => {
   const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
   
-  const systemInstruction = `You are a precise, skeptical, and helpful financial auditor. You must output your analysis in ${langInstruction}.`;
+  const systemInstruction = getScenarioInstruction(scenario, langInstruction);
   
   const promptText = `
-    You are a Senior Financial Auditor. Analyze the following financial text/CSV data.
-    Identify anomalies, high-risk transactions, and compliance issues.
-    Extract key metrics and prepare a chart dataset for the most significant breakdown (e.g., expenses by category).
-    
+    Analyze the following financial text/CSV data.
     Data:
     ${data}
 
@@ -173,7 +189,7 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      summary: { type: Type.STRING, description: `A professional executive summary of the financial data in ${langInstruction}.` },
+      summary: { type: Type.STRING, description: `A professional executive summary in ${langInstruction}.` },
       risks: {
         type: Type.ARRAY,
         items: {
@@ -237,32 +253,43 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
 
 /**
  * Analyzes an image (Receipt/Invoice) or PDF.
- * Supports: Gemini, GPT-4o, Qwen-VL.
- * DeepSeek falls back to Gemini.
  */
-export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<string> => {
+export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 'gemini', language: Language = 'en', scenario: AuditScenario = 'general'): Promise<string> => {
   const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
   
+  let scenarioPrompt = "";
+  switch (scenario) {
+    case 'fraud':
+      scenarioPrompt = "SCRUTINIZE this document for FORGERY. Check for mismatched fonts, alignment issues, altered numbers, or fake business details. Report any sign of digital manipulation.";
+      break;
+    case 'tax':
+      scenarioPrompt = "Extract all TAX RELEVANT details: Tax ID (TIN/VAT), Tax Amount, Tax Rate, and Total. Determine if this constitutes a valid tax invoice for deduction purposes.";
+      break;
+    case 'compliance':
+      scenarioPrompt = "Review this contract/invoice for LEGAL & COMPLIANCE. Check for signatures, clear terms, dates, and authorized parties. Identify missing mandatory fields.";
+      break;
+    default:
+      scenarioPrompt = "Identify the Vendor, Date, Total Amount, and categorize the expense.";
+      break;
+  }
+
   const prompt = `
-    Perform a forensic audit on this document (Receipt, Invoice, or Financial PDF).
-    1. Identify the Vendor/Entity, Date, and Total Amount.
-    2. Check for signs of tampering or alteration.
-    3. Categorize the expense or document type.
-    4. Highlight any missing information (e.g., Tax ID, Signatures).
-    5. If it's a multi-page PDF, summarize the key financial findings.
+    Perform a forensic audit on this document.
+    Scenario Mode: ${scenario.toUpperCase()}
+    
+    Tasks:
+    1. ${scenarioPrompt}
+    2. Provide a summary of findings.
+    3. Highlight specific risks based on the Scenario Mode.
     
     Format the output in clear Markdown in ${langInstruction}.
   `;
 
   // --- GPT & Qwen (Vision Supported) ---
-  // DeepSeek currently is text-optimized (V3), so we skip it here and use fallback
   if (provider === 'gpt' || provider === 'qwen') {
     const config = getProviderConfig(provider);
     if (config) {
-      // Qwen VL model specific
       if (provider === 'qwen') config.model = 'qwen-vl-max'; 
-      // GPT uses default gpt-4o defined in config
-
       try {
         const dataUrl = await fileToDataUrl(file);
         const messages = [
@@ -314,7 +341,6 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
   // --- OpenAI Compatible Implementation (DeepSeek, GPT, Qwen) ---
   const config = getProviderConfig(provider);
   if (config) {
-    // Convert history to OpenAI format
     const messages = history.map(msg => ({
       role: msg.role === 'model' ? 'assistant' : 'user',
       content: msg.text

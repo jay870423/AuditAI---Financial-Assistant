@@ -30,7 +30,7 @@ export const translations = {
     },
     auditView: {
       title: "Financial Data Analysis",
-      desc: "Paste financial statements, transaction logs (CSV format), or ledger entries below.",
+      desc: "Paste financial statements, transaction logs (CSV format), or import an Excel file below.",
       placeholder: "Date, Description, Amount, Category\n2024-01-01, Office Supplies, -120.50, Operations...",
       runAudit: "Run Audit",
       processing: "Processing...",
@@ -40,7 +40,18 @@ export const translations = {
       noChart: "No chart data available",
       error: "An error occurred during analysis. Please try again.",
       riskLabel: "Risk",
-      fixLabel: "Fix:"
+      fixLabel: "Fix:",
+      scenarioLabel: "Audit Focus:",
+      scenarios: {
+        general: "General Overview",
+        fraud: "Fraud Detection",
+        tax: "Tax Compliance",
+        compliance: "Internal Control"
+      },
+      exportReport: "Export Report",
+      downloadTemplate: "Download Template",
+      importExcel: "Import Excel",
+      templateFileName: "AuditAI_Data_Template.xlsx"
     },
     imageView: {
       uploadTitle: "Upload Document",
@@ -57,7 +68,15 @@ export const translations = {
       startCamera: "Open Camera",
       capture: "Capture",
       cancel: "Cancel",
-      cameraError: "Camera access denied or unavailable."
+      cameraError: "Camera access denied or unavailable.",
+      scenarioLabel: "Doc Type:",
+      scenarios: {
+        general: "General Receipt",
+        fraud: "Forgery Check",
+        tax: "VAT/Tax Invoice",
+        compliance: "Contract Review"
+      },
+      exportReport: "Save Report"
     },
     login: {
       title: "Sign in to AuditAI",
@@ -101,7 +120,7 @@ export const translations = {
     },
     auditView: {
       title: "财务数据分析",
-      desc: "在下方粘贴财务报表、交易日志（CSV 格式）或分类账条目。",
+      desc: "在下方粘贴财务报表、交易日志（CSV 格式）或直接导入 Excel 数据文件。",
       placeholder: "日期, 描述, 金额, 类别\n2024-01-01, 办公用品, -120.50, 运营...",
       runAudit: "运行审计",
       processing: "处理中...",
@@ -111,7 +130,18 @@ export const translations = {
       noChart: "暂无图表数据",
       error: "分析过程中发生错误，请重试。",
       riskLabel: "风险",
-      fixLabel: "建议:"
+      fixLabel: "建议:",
+      scenarioLabel: "审计重点:",
+      scenarios: {
+        general: "综合概览",
+        fraud: "反欺诈检测",
+        tax: "税务合规",
+        compliance: "内控审计"
+      },
+      exportReport: "导出报告",
+      downloadTemplate: "下载 Excel 模板",
+      importExcel: "导入 Excel 数据",
+      templateFileName: "AuditAI_数据模板.xlsx"
     },
     imageView: {
       uploadTitle: "上传文档",
@@ -128,7 +158,15 @@ export const translations = {
       startCamera: "打开相机",
       capture: "拍摄",
       cancel: "取消",
-      cameraError: "无法访问相机或权限被拒绝。"
+      cameraError: "无法访问相机或权限被拒绝。",
+      scenarioLabel: "凭证类型:",
+      scenarios: {
+        general: "通用收据",
+        fraud: "防伪/篡改检测",
+        tax: "增值税/税务发票",
+        compliance: "合同审查"
+      },
+      exportReport: "保存报告"
     },
     login: {
       title: "登录 AuditAI",

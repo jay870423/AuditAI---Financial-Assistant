@@ -1,3 +1,4 @@
+
 export enum ViewState {
   DASHBOARD = 'DASHBOARD',
   AUDIT_TEXT = 'AUDIT_TEXT',
@@ -6,6 +7,8 @@ export enum ViewState {
 }
 
 export type ModelProvider = 'gemini' | 'deepseek' | 'gpt' | 'qwen';
+
+export type AuditScenario = 'general' | 'fraud' | 'tax' | 'compliance';
 
 export interface ChartDataPoint {
   category: string;

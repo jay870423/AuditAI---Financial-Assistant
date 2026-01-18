@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { analyzeReceiptImage } from '../services/geminiService';
-import { ProcessingStatus, ModelProvider } from '../types';
-import { UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Lock, FileText, X, Camera, Aperture } from 'lucide-react';
+import { ProcessingStatus, ModelProvider, AuditScenario } from '../types';
+import { UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Lock, FileText, X, Camera, Aperture, ScanSearch, Printer } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../i18n';
 
@@ -17,7 +17,9 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [analysisText, setAnalysisText] = useState<string>('');
-  
+  const [scenario, setScenario] = useState<AuditScenario>('general');
+  const printRef = useRef<HTMLDivElement>(null);
+
   // Camera State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -130,13 +132,17 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
     if (!selectedFile) return;
     setStatus(ProcessingStatus.PROCESSING);
     try {
-      const text = await analyzeReceiptImage(selectedFile, modelProvider, language);
+      const text = await analyzeReceiptImage(selectedFile, modelProvider, language, scenario);
       setAnalysisText(text);
       setStatus(ProcessingStatus.SUCCESS);
     } catch (e) {
       console.error(e);
       setStatus(ProcessingStatus.ERROR);
     }
+  };
+
+  const handleExport = () => {
+    window.print();
   };
 
   // Clean up stream on unmount
@@ -190,14 +196,13 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
                  <div className="w-14 h-14 bg-white rounded-full border-2 border-black"></div>
               </button>
 
-              <div className="w-16 text-right">
-                {/* Placeholder for potential flash toggle or camera flip */}
-              </div>
+              <div className="w-16 text-right"></div>
            </div>
         </div>
       )}
 
-      <div className="space-y-4 md:space-y-6">
+      {/* Input Section - Hidden on Print */}
+      <div className="space-y-4 md:space-y-6 print:hidden">
         {cameraError && (
           <div className="p-3 bg-red-100 text-red-700 rounded-lg flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
@@ -266,6 +271,22 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
              </div>
 
              <div className="mt-4 w-full flex flex-col gap-3">
+                <div className="flex items-center gap-2 w-full">
+                     <div className="relative w-full">
+                       <select 
+                         value={scenario}
+                         onChange={(e) => setScenario(e.target.value as AuditScenario)}
+                         className="appearance-none w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg pl-3 pr-8 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer"
+                       >
+                         <option value="general">{t('imageView.scenarios.general')}</option>
+                         <option value="fraud">{t('imageView.scenarios.fraud')}</option>
+                         <option value="tax">{t('imageView.scenarios.tax')}</option>
+                         <option value="compliance">{t('imageView.scenarios.compliance')}</option>
+                       </select>
+                       <ScanSearch className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                     </div>
+                </div>
+
                 {!session && (
                   <div className="flex items-center justify-center gap-2 text-amber-600 text-sm bg-amber-50 px-3 py-2.5 rounded-lg border border-amber-100">
                     <Lock className="w-4 h-4" />
@@ -289,29 +310,58 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
       </div>
 
       <div className="space-y-6">
-         <div className="bg-white h-full min-h-[300px] md:min-h-[500px] p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-4 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              {t('imageView.auditResults')}
-            </h3>
+         <div className="bg-white h-full min-h-[300px] md:min-h-[500px] p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col print:shadow-none print:border-none print:p-0">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4 print:border-slate-800">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2 print:text-xl">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 print:hidden" />
+                {t('imageView.auditResults')}
+              </h3>
+              {analysisText && (
+                <button 
+                 onClick={handleExport}
+                 className="flex items-center gap-2 text-slate-600 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors print:hidden"
+                >
+                 <Printer className="w-3.5 h-3.5" />
+                 {t('imageView.exportReport')}
+                </button>
+              )}
+            </div>
             
             {status === ProcessingStatus.IDLE && !analysisText && (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-4 text-center print:hidden">
                 <FileText className="w-12 h-12 mb-3 opacity-20" />
                 <p>{t('imageView.emptyState')}</p>
               </div>
             )}
 
             {status === ProcessingStatus.ERROR && (
-              <div className="p-4 bg-red-50 text-red-700 rounded-xl flex items-center gap-3">
+              <div className="p-4 bg-red-50 text-red-700 rounded-xl flex items-center gap-3 print:hidden">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" /> 
                 <span className="text-sm font-medium">{t('imageView.error')}</span>
               </div>
             )}
 
             {analysisText && (
-              <div className="prose prose-sm prose-slate max-w-none overflow-y-auto pr-1 leading-relaxed">
+              <div className="prose prose-sm prose-slate max-w-none overflow-y-auto pr-1 leading-relaxed print:text-black">
+                {/* Print Header inside result area */}
+                <div className="hidden print:block mb-4">
+                  <h1 className="text-xl font-bold">Document Audit Report</h1>
+                  <p className="text-xs text-slate-500">Mode: {t(`imageView.scenarios.${scenario}`)} | Date: {new Date().toLocaleDateString()}</p>
+                </div>
+                
+                {/* Image Print Preview */}
+                {selectedFile && !isPdf && previewUrl && (
+                  <div className="hidden print:block mb-6 w-1/2 mx-auto border border-slate-300 rounded-lg p-2">
+                    <img src={previewUrl} className="w-full object-contain max-h-60" alt="Audit Evidence" />
+                    <p className="text-center text-xs text-slate-500 mt-1">Audit Evidence: {selectedFile.name}</p>
+                  </div>
+                )}
+                
                 <ReactMarkdown>{analysisText}</ReactMarkdown>
+                
+                <div className="hidden print:block mt-8 pt-4 border-t text-xs text-slate-400 text-center">
+                  Generated by AuditAI
+                </div>
               </div>
             )}
          </div>
