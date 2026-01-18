@@ -3,7 +3,8 @@ export enum ViewState {
   DASHBOARD = 'DASHBOARD',
   AUDIT_TEXT = 'AUDIT_TEXT',
   AUDIT_IMAGE = 'AUDIT_IMAGE',
-  CHAT = 'CHAT'
+  CHAT = 'CHAT',
+  MANUAL = 'MANUAL'
 }
 
 export type ModelProvider = 'gemini' | 'deepseek' | 'gpt' | 'qwen';

@@ -3,6 +3,7 @@ import { ViewState, ChatMessage, ModelProvider } from './types';
 import AuditView from './components/AuditView';
 import ImageView from './components/ImageView';
 import LoginModal from './components/LoginView';
+import ManualView from './components/ManualView';
 import { sendChatMessage } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { LanguageProvider, useLanguage } from './i18n';
@@ -22,7 +23,8 @@ import {
   Loader2,
   Cpu,
   FileText,
-  Globe
+  Globe,
+  BookOpen
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -41,24 +43,23 @@ const MainApp: React.FC = () => {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const hasInitializedChat = useRef(false);
 
   // Initialize Chat History based on language
+  // If the user hasn't started chatting (history empty or only has the welcome msg), update the welcome msg when language changes.
   useEffect(() => {
-    if (!hasInitializedChat.current) {
+    const isInitialState = chatHistory.length === 0 || (chatHistory.length === 1 && chatHistory[0].id === 'init-welcome');
+    
+    if (isInitialState) {
       setChatHistory([
         {
-          id: '1',
+          id: 'init-welcome',
           role: 'model',
           text: t('chat.initialMessage'),
           timestamp: new Date()
         }
       ]);
-      hasInitializedChat.current = true;
     }
-  }, [t]); // We only want this to run once or when t becomes available, but logical constraints mean we might just let it be. 
-  // Ideally for real language switching mid-chat we don't clear history, so we leave it as is. 
-  // If the user switches language, new messages will be in new language.
+  }, [language, t]); 
 
   useEffect(() => {
     const checkSession = async () => {
@@ -160,6 +161,8 @@ const MainApp: React.FC = () => {
         return <AuditView session={session} onRequireLogin={requireLogin} modelProvider={modelProvider} />;
       case ViewState.AUDIT_IMAGE:
         return <ImageView session={session} onRequireLogin={requireLogin} modelProvider={modelProvider} />;
+      case ViewState.MANUAL:
+        return <ManualView />;
       case ViewState.CHAT:
         return (
           <div className="flex flex-col h-full bg-slate-50 md:bg-white md:rounded-xl md:shadow-sm md:border md:border-slate-200 overflow-hidden absolute inset-0 md:relative">
@@ -346,6 +349,7 @@ const MainApp: React.FC = () => {
             { view: ViewState.AUDIT_TEXT, icon: FileSearch, label: t('nav.auditText') },
             { view: ViewState.AUDIT_IMAGE, icon: ScanLine, label: t('nav.auditImage') },
             { view: ViewState.CHAT, icon: MessageSquareText, label: t('nav.chat') },
+            { view: ViewState.MANUAL, icon: BookOpen, label: t('nav.manual') },
           ].map((item) => (
             <button 
               key={item.view}
@@ -409,6 +413,7 @@ const MainApp: React.FC = () => {
               {currentView === ViewState.AUDIT_TEXT && t('nav.auditText')}
               {currentView === ViewState.AUDIT_IMAGE && t('nav.auditImage')}
               {currentView === ViewState.CHAT && t('nav.chat')}
+              {currentView === ViewState.MANUAL && t('nav.manual')}
             </h1>
           </div>
           <div className="flex items-center gap-2 md:gap-4">

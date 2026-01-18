@@ -10,6 +10,7 @@ export const translations = {
       auditText: "Data Analysis",
       auditImage: "Document Scan",
       chat: "AI Assistant",
+      manual: "User Manual",
       signIn: "Sign In",
       signOut: "Sign Out",
       loginRequired: "Login required"
@@ -83,6 +84,7 @@ export const translations = {
       desc: "Authentication is required to perform audits and save data.",
       google: "Continue with Google",
       github: "Continue with GitHub",
+      wechat: "Continue with WeChat",
       terms: "By signing in, you agree to our Terms of Service.",
       securedBy: "Secured by Supabase Authentication."
     },
@@ -100,6 +102,7 @@ export const translations = {
       auditText: "数据分析",
       auditImage: "凭证扫描",
       chat: "AI 助手",
+      manual: "使用手册",
       signIn: "登录",
       signOut: "退出",
       loginRequired: "需要登录"
@@ -173,6 +176,7 @@ export const translations = {
       desc: "执行审计和保存数据需要身份验证。",
       google: "使用 Google 继续",
       github: "使用 GitHub 继续",
+      wechat: "使用微信登录",
       terms: "登录即表示您同意我们的服务条款。",
       securedBy: "由 Supabase 提供安全认证。"
     },

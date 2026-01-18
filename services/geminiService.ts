@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuditAnalysisResult, ChatMessage, ModelProvider, AuditScenario } from "../types";
 import { Language } from "../i18n";
@@ -335,8 +334,28 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
  * Chat functionality for financial context.
  */
 export const sendChatMessage = async (history: ChatMessage[], newMessage: string, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<string> => {
-  const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
-  const systemInstruction = `You are a financial consultant assistant. Answer questions based on general accounting principles (GAAP/IFRS) and auditing standards. Keep answers concise. Answer in ${langInstruction}.`;
+  // Define language-specific personas for better context
+  let systemInstruction: string;
+  
+  if (language === 'zh') {
+    systemInstruction = `你是一名专业的财务审计顾问和智能会计助手 (AuditAI)。
+    你的职责：
+    1. 根据《企业会计准则》(CAS) 和 国际财务报告准则 (IFRS) 回答用户问题。
+    2. 解释复杂的税务法规（如中国增值税、所得税）。
+    3. 协助用户分析财务报表中的异常。
+    4. 保持专业、客观、简洁的语调。
+    
+    请始终使用简体中文 (Simplified Chinese) 回答。`;
+  } else {
+    systemInstruction = `You are a professional financial audit consultant and intelligent accounting assistant (AuditAI).
+    Your responsibilities:
+    1. Answer questions based on US GAAP and IFRS.
+    2. Explain complex tax regulations and compliance requirements.
+    3. Assist users in interpreting financial statement anomalies.
+    4. Maintain a professional, objective, and concise tone.
+    
+    Please always answer in English.`;
+  }
 
   // --- OpenAI Compatible Implementation (DeepSeek, GPT, Qwen) ---
   const config = getProviderConfig(provider);
