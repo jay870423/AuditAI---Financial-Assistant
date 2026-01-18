@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { ShieldCheck, Github, Chrome, Loader2, X } from 'lucide-react';
+import { useLanguage } from '../i18n';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface LoginModalProps {
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -53,8 +55,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Sign in to AuditAI</h1>
-            <p className="text-slate-500 mt-2">Authentication is required to perform audits and save data.</p>
+            <h1 className="text-2xl font-bold text-slate-900">{t('login.title')}</h1>
+            <p className="text-slate-500 mt-2">{t('login.desc')}</p>
           </div>
         </div>
 
@@ -71,7 +73,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             className="w-full flex items-center justify-center gap-3 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 px-6 py-3.5 rounded-xl font-medium transition-all focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Chrome className="w-5 h-5 text-red-500" />}
-            Continue with Google
+            {t('login.google')}
           </button>
 
           <button
@@ -80,13 +82,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             className="w-full flex items-center justify-center gap-3 bg-[#24292F] text-white hover:bg-[#24292F]/90 px-6 py-3.5 rounded-xl font-medium transition-all focus:ring-2 focus:ring-slate-400 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Github className="w-5 h-5" />}
-            Continue with GitHub
+            {t('login.github')}
           </button>
         </div>
 
         <p className="text-xs text-slate-400">
-          By signing in, you agree to our Terms of Service.<br/>
-          Secured by Supabase Authentication.
+          {t('login.terms')}<br/>
+          {t('login.securedBy')}
         </p>
       </div>
     </div>

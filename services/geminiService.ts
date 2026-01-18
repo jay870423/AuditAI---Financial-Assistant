@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuditAnalysisResult, ChatMessage, ModelProvider } from "../types";
+import { Language } from "../i18n";
 
 // Ensure we don't crash if env is missing during initial load
 const apiKey = process.env.API_KEY || 'MISSING_API_KEY';
@@ -122,8 +123,11 @@ const getProviderConfig = (provider: ModelProvider, jsonMode: boolean = false): 
 /**
  * Analyzes financial text or CSV data using Gemini, DeepSeek, GPT, or Qwen.
  */
-export const analyzeFinancialData = async (data: string, provider: ModelProvider = 'gemini'): Promise<AuditAnalysisResult> => {
-  const systemInstruction = "You are a precise, skeptical, and helpful financial auditor.";
+export const analyzeFinancialData = async (data: string, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<AuditAnalysisResult> => {
+  const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
+  
+  const systemInstruction = `You are a precise, skeptical, and helpful financial auditor. You must output your analysis in ${langInstruction}.`;
+  
   const promptText = `
     You are a Senior Financial Auditor. Analyze the following financial text/CSV data.
     Identify anomalies, high-risk transactions, and compliance issues.
@@ -132,7 +136,12 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
     Data:
     ${data}
 
-    Output must be valid JSON matching this structure:
+    Output must be valid JSON matching this structure. 
+    IMPORTANT: The values for 'summary', 'description', 'recommendation', 'label', 'category', 'change' MUST be in ${langInstruction}.
+    The keys (e.g., 'summary', 'risks', 'severity') must remain in English.
+    The 'severity' value must be exactly one of: "high", "medium", "low".
+
+    JSON Structure:
     {
       "summary": "string",
       "risks": [{"severity": "high|medium|low", "description": "string", "recommendation": "string"}],
@@ -164,15 +173,15 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      summary: { type: Type.STRING, description: "A professional executive summary of the financial data." },
+      summary: { type: Type.STRING, description: `A professional executive summary of the financial data in ${langInstruction}.` },
       risks: {
         type: Type.ARRAY,
         items: {
           type: Type.OBJECT,
           properties: {
             severity: { type: Type.STRING, enum: ["high", "medium", "low"] },
-            description: { type: Type.STRING },
-            recommendation: { type: Type.STRING },
+            description: { type: Type.STRING, description: `Risk description in ${langInstruction}.` },
+            recommendation: { type: Type.STRING, description: `Recommendation in ${langInstruction}.` },
           },
           required: ["severity", "description", "recommendation"]
         }
@@ -182,9 +191,9 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
         items: {
           type: Type.OBJECT,
           properties: {
-            label: { type: Type.STRING },
+            label: { type: Type.STRING, description: `Metric label in ${langInstruction}.` },
             value: { type: Type.STRING },
-            change: { type: Type.STRING, description: "Percentage change or trend description" }
+            change: { type: Type.STRING, description: `Percentage change or trend description in ${langInstruction}.` }
           },
           required: ["label", "value"]
         }
@@ -195,7 +204,7 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
         items: {
           type: Type.OBJECT,
           properties: {
-            category: { type: Type.STRING },
+            category: { type: Type.STRING, description: `Category name in ${langInstruction}.` },
             value: { type: Type.NUMBER }
           },
           required: ["category", "value"]
@@ -231,7 +240,9 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
  * Supports: Gemini, GPT-4o, Qwen-VL.
  * DeepSeek falls back to Gemini.
  */
-export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 'gemini'): Promise<string> => {
+export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<string> => {
+  const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
+  
   const prompt = `
     Perform a forensic audit on this document (Receipt, Invoice, or Financial PDF).
     1. Identify the Vendor/Entity, Date, and Total Amount.
@@ -240,7 +251,7 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
     4. Highlight any missing information (e.g., Tax ID, Signatures).
     5. If it's a multi-page PDF, summarize the key financial findings.
     
-    Format the output in clear Markdown.
+    Format the output in clear Markdown in ${langInstruction}.
   `;
 
   // --- GPT & Qwen (Vision Supported) ---
@@ -296,8 +307,9 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
 /**
  * Chat functionality for financial context.
  */
-export const sendChatMessage = async (history: ChatMessage[], newMessage: string, provider: ModelProvider = 'gemini'): Promise<string> => {
-  const systemInstruction = "You are a financial consultant assistant. Answer questions based on general accounting principles (GAAP/IFRS) and auditing standards. Keep answers concise.";
+export const sendChatMessage = async (history: ChatMessage[], newMessage: string, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<string> => {
+  const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
+  const systemInstruction = `You are a financial consultant assistant. Answer questions based on general accounting principles (GAAP/IFRS) and auditing standards. Keep answers concise. Answer in ${langInstruction}.`;
 
   // --- OpenAI Compatible Implementation (DeepSeek, GPT, Qwen) ---
   const config = getProviderConfig(provider);

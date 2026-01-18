@@ -4,6 +4,7 @@ import { AuditAnalysisResult, ProcessingStatus, ModelProvider } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AlertTriangle, TrendingUp, AlertCircle, FileText, Loader2, Lock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useLanguage } from '../i18n';
 
 interface AuditViewProps {
   session: any;
@@ -12,6 +13,7 @@ interface AuditViewProps {
 }
 
 const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelProvider }) => {
+  const { t, language } = useLanguage();
   const [inputText, setInputText] = useState('');
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [result, setResult] = useState<AuditAnalysisResult | null>(null);
@@ -25,7 +27,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
     setStatus(ProcessingStatus.PROCESSING);
     setResult(null);
     try {
-      const data = await analyzeFinancialData(inputText, modelProvider);
+      const data = await analyzeFinancialData(inputText, modelProvider, language);
       setResult(data);
       setStatus(ProcessingStatus.SUCCESS);
     } catch (e) {
@@ -48,14 +50,14 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
       <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
         <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5 text-indigo-600" />
-          Financial Data Analysis
+          {t('auditView.title')}
         </h2>
         <p className="text-slate-500 mb-4 text-sm leading-relaxed">
-          Paste financial statements, transaction logs (CSV format), or ledger entries below.
+          {t('auditView.desc')}
         </p>
         <textarea
           className="w-full h-40 md:h-48 p-4 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm resize-none transition-all"
-          placeholder="Date, Description, Amount, Category&#10;2024-01-01, Office Supplies, -120.50, Operations..."
+          placeholder={t('auditView.placeholder')}
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           style={{ fontSize: '16px' }} // Prevent iOS Zoom
@@ -64,7 +66,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
           {!session && (
             <div className="w-full sm:w-auto flex items-center justify-center gap-2 text-amber-600 text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
               <Lock className="w-4 h-4" />
-              Login required
+              {t('nav.loginRequired')}
             </div>
           )}
           <button
@@ -73,9 +75,9 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
             className={`w-full sm:w-auto sm:ml-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-sm ${modelProvider === 'deepseek' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
           >
             {status === ProcessingStatus.PROCESSING ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> {t('auditView.processing')}</>
             ) : (
-              'Run Audit'
+              t('auditView.runAudit')
             )}
           </button>
         </div>
@@ -84,7 +86,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
       {status === ProcessingStatus.ERROR && (
         <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center gap-2">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">An error occurred during analysis. Please try again.</span>
+          <span className="text-sm">{t('auditView.error')}</span>
         </div>
       )}
 
@@ -93,7 +95,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
           {/* Summary & Metrics */}
           <div className="lg:col-span-2 space-y-4 md:space-y-6">
             <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
-              <h3 className="font-semibold text-slate-800 mb-3 border-b border-slate-100 pb-2">Executive Summary</h3>
+              <h3 className="font-semibold text-slate-800 mb-3 border-b border-slate-100 pb-2">{t('auditView.execSummary')}</h3>
               <div className="prose prose-sm prose-slate max-w-none text-slate-600 leading-relaxed">
                 <ReactMarkdown>{result.summary}</ReactMarkdown>
               </div>
@@ -118,18 +120,18 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
             <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200">
               <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
-                Detected Risks
+                {t('auditView.risks')}
               </h3>
               <div className="space-y-4">
                 {result.risks.map((risk, idx) => (
                   <div key={idx} className={`p-4 rounded-xl border ${getSeverityColor(risk.severity)}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="uppercase text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/60 border border-black/5 tracking-wide">
-                        {risk.severity} Risk
+                        {risk.severity} {t('auditView.riskLabel')}
                       </span>
                     </div>
                     <p className="font-medium text-sm mb-2 leading-snug">{risk.description}</p>
-                    <p className="text-xs opacity-90"><span className="font-bold opacity-100">Fix:</span> {risk.recommendation}</p>
+                    <p className="text-xs opacity-90"><span className="font-bold opacity-100">{t('auditView.fixLabel')}</span> {risk.recommendation}</p>
                   </div>
                 ))}
               </div>
@@ -141,7 +143,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
             <div className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 lg:sticky lg:top-6">
               <h3 className="font-semibold text-slate-800 mb-6 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-indigo-600" />
-                Visuals
+                {t('auditView.visuals')}
               </h3>
               {result.chartData && result.chartData.length > 0 ? (
                 <div className="h-56 md:h-64 w-full">
@@ -173,7 +175,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
                 </div>
               ) : (
                 <div className="h-56 flex items-center justify-center text-slate-400 text-sm italic border-2 border-dashed border-slate-200 rounded-lg">
-                  No chart data available
+                  {t('auditView.noChart')}
                 </div>
               )}
             </div>

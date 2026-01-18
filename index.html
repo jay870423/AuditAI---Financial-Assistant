@@ -11,7 +11,9 @@
       gtag('config', 'G-KNCV78G9H1');
     </script>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>AuditAI - Financial Assistant</title>
     <!-- We keep Tailwind CDN for simplicity in this setup, though local installation is also possible -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,6 +22,8 @@
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
+        /* Prevent bounce on iOS */
+        overscroll-behavior-y: none; 
       }
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
@@ -35,6 +39,18 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8; 
+      }
+      
+      /* Mobile Safe Area Utilities */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 1rem);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 1rem);
+      }
+      .h-safe-screen {
+        height: 100vh; /* Fallback */
+        height: 100dvh;
       }
     </style>
   <script type="importmap">

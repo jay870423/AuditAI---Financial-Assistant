@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { analyzeReceiptImage } from '../services/geminiService';
 import { ProcessingStatus, ModelProvider } from '../types';
-import { UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Lock, FileText, X, ChevronRight } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Lock, FileText, X, Camera, Aperture } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useLanguage } from '../i18n';
 
 interface ImageViewProps {
   session: any;
@@ -11,25 +12,35 @@ interface ImageViewProps {
 }
 
 const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelProvider }) => {
+  const { t, language } = useLanguage();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [analysisText, setAnalysisText] = useState<string>('');
+  
+  // Camera State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      setSelectedFile(file);
-      setAnalysisText('');
-      setStatus(ProcessingStatus.IDLE);
+      processFile(event.target.files[0]);
+    }
+  };
 
-      // Handle preview based on file type
-      if (file.type.startsWith('image/')) {
-        setPreviewUrl(URL.createObjectURL(file));
-      } else {
-        setPreviewUrl(null); // No preview for PDFs, we show an icon instead
-      }
+  const processFile = (file: File) => {
+    setSelectedFile(file);
+    setAnalysisText('');
+    setStatus(ProcessingStatus.IDLE);
+
+    // Handle preview based on file type
+    if (file.type.startsWith('image/')) {
+      setPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setPreviewUrl(null); // No preview for PDFs
     }
   };
 
@@ -43,6 +54,74 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
     }
   };
 
+  const startCamera = async () => {
+    setCameraError('');
+    
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError("Camera API not supported in this context. Please use HTTPS or localhost.");
+      return;
+    }
+
+    try {
+      // Try with environment facing mode first
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      streamRef.current = stream;
+      setIsCameraOpen(true);
+    } catch (err: any) {
+      console.warn("Camera environment mode failed, trying default:", err);
+      // Fallback to any video device if environment fails (e.g. laptop)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        streamRef.current = stream;
+        setIsCameraOpen(true);
+      } catch (fallbackErr: any) {
+        console.error("Camera access error:", fallbackErr);
+        if (fallbackErr.name === 'NotAllowedError' || fallbackErr.name === 'PermissionDeniedError') {
+             setCameraError("Permission denied. Please allow camera access in your browser settings.");
+        } else {
+             setCameraError(t('imageView.cameraError'));
+        }
+      }
+    }
+  };
+
+  // Effect to attach stream to video element when camera opens
+  useEffect(() => {
+    if (isCameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [isCameraOpen]);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            processFile(file);
+            stopCamera();
+          }
+        }, 'image/jpeg', 0.9);
+      }
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!session) {
       onRequireLogin();
@@ -51,7 +130,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
     if (!selectedFile) return;
     setStatus(ProcessingStatus.PROCESSING);
     try {
-      const text = await analyzeReceiptImage(selectedFile, modelProvider);
+      const text = await analyzeReceiptImage(selectedFile, modelProvider, language);
       setAnalysisText(text);
       setStatus(ProcessingStatus.SUCCESS);
     } catch (e) {
@@ -60,35 +139,111 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
     }
   };
 
+  // Clean up stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   const isPdf = selectedFile?.type === 'application/pdf';
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 animate-fade-in pb-12">
-      <div className="space-y-4 md:space-y-6">
-        {!selectedFile ? (
-          <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 text-center relative h-64 md:h-80 flex flex-col items-center justify-center">
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-            />
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="cursor-pointer group flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-300 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 active:bg-indigo-50 active:scale-[0.98] transition-all touch-manipulation"
-            >
-              <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full mb-4 group-hover:bg-white group-hover:scale-110 transition-transform shadow-sm">
-                <UploadCloud className="w-8 h-8" />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 animate-fade-in pb-12 relative">
+      
+      {/* Camera Overlay */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col h-safe-screen">
+           <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+             <video 
+               ref={videoRef} 
+               autoPlay 
+               playsInline
+               muted
+               className="w-full h-full object-cover"
+             />
+             <div className="absolute inset-0 pointer-events-none">
+                <div className="w-full h-full border-[50px] border-black/40 relative">
+                   <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white/80 m-4"></div>
+                   <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white/80 m-4"></div>
+                   <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white/80 m-4"></div>
+                   <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white/80 m-4"></div>
+                </div>
+             </div>
+           </div>
+           
+           <div className="bg-black flex items-center justify-between px-8 py-6 pb-safe">
+              <button 
+                onClick={stopCamera}
+                className="text-white font-medium px-4 py-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors"
+              >
+                {t('imageView.cancel')}
+              </button>
+              
+              <button 
+                onClick={capturePhoto}
+                className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform"
+                title={t('imageView.capture')}
+              >
+                 <div className="w-14 h-14 bg-white rounded-full border-2 border-black"></div>
+              </button>
+
+              <div className="w-16 text-right">
+                {/* Placeholder for potential flash toggle or camera flip */}
               </div>
-              <h3 className="text-lg font-bold text-slate-800 mb-1">Upload Document</h3>
-              <p className="text-slate-500 text-sm px-4">Tap to select Image or PDF</p>
+           </div>
+        </div>
+      )}
+
+      <div className="space-y-4 md:space-y-6">
+        {cameraError && (
+          <div className="p-3 bg-red-100 text-red-700 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            <span className="text-sm">{cameraError}</span>
+          </div>
+        )}
+
+        {!selectedFile ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-auto md:h-80">
+            {/* Upload Option */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center flex flex-col items-center justify-center relative touch-manipulation">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer group flex flex-col items-center justify-center w-full h-full p-4 rounded-xl hover:bg-indigo-50 active:scale-[0.98] transition-all"
+              >
+                <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full mb-4 group-hover:bg-white group-hover:scale-110 transition-transform shadow-sm">
+                  <UploadCloud className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-1">{t('imageView.uploadTitle')}</h3>
+                <p className="text-slate-500 text-sm">{t('imageView.uploadDesc')}</p>
+              </div>
+            </div>
+
+            {/* Camera Option */}
+            <div 
+              onClick={startCamera}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center flex flex-col items-center justify-center cursor-pointer group hover:border-emerald-500 hover:bg-emerald-50 active:scale-[0.98] transition-all touch-manipulation"
+            >
+              <div className="p-4 bg-emerald-50 text-emerald-600 rounded-full mb-4 group-hover:bg-white group-hover:scale-110 transition-transform shadow-sm">
+                <Camera className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-1">{t('imageView.cameraTitle')}</h3>
+              <p className="text-slate-500 text-sm">{t('imageView.cameraDesc')}</p>
             </div>
           </div>
         ) : (
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col relative overflow-hidden">
              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
-                <h3 className="font-semibold text-slate-700 text-sm">Selected Document</h3>
+                <h3 className="font-semibold text-slate-700 text-sm">{t('imageView.selectedDoc')}</h3>
                 <button 
                   onClick={clearFile}
                   className="bg-slate-100 hover:bg-slate-200 p-2 rounded-full text-slate-500 hover:text-red-500 transition-colors"
@@ -103,7 +258,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
                   <div className="flex flex-col items-center text-slate-500 p-4 text-center">
                     <FileText className="w-16 h-16 mb-2 text-red-500 drop-shadow-sm" />
                     <span className="font-medium text-slate-700 truncate max-w-[200px]">{selectedFile.name}</span>
-                    <span className="text-xs uppercase mt-1 bg-slate-200 px-2 py-0.5 rounded text-slate-600">PDF</span>
+                    <span className="text-xs uppercase mt-1 bg-slate-200 px-2 py-0.5 rounded text-slate-600">{t('imageView.pdfLabel')}</span>
                   </div>
                 ) : (
                   <img src={previewUrl!} alt="Preview" className="w-full h-full object-contain" />
@@ -114,7 +269,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
                 {!session && (
                   <div className="flex items-center justify-center gap-2 text-amber-600 text-sm bg-amber-50 px-3 py-2.5 rounded-lg border border-amber-100">
                     <Lock className="w-4 h-4" />
-                    Login required
+                    {t('nav.loginRequired')}
                   </div>
                 )}
                 <button
@@ -123,9 +278,9 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
                   className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white py-3.5 rounded-xl font-bold transition-all disabled:opacity-50 shadow-sm"
                 >
                   {status === ProcessingStatus.PROCESSING ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing...</>
+                    <><Loader2 className="w-5 h-5 animate-spin" /> {t('imageView.analyzing')}</>
                   ) : (
-                    <><ImageIcon className="w-5 h-5" /> Analyze Now</>
+                    <><Aperture className="w-5 h-5" /> {t('imageView.analyzeNow')}</>
                   )}
                 </button>
              </div>
@@ -137,20 +292,20 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
          <div className="bg-white h-full min-h-[300px] md:min-h-[500px] p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-4 flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              Audit Results
+              {t('imageView.auditResults')}
             </h3>
             
             {status === ProcessingStatus.IDLE && !analysisText && (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-4 text-center">
                 <FileText className="w-12 h-12 mb-3 opacity-20" />
-                <p>Upload a file and tap analyze to see forensic details here.</p>
+                <p>{t('imageView.emptyState')}</p>
               </div>
             )}
 
             {status === ProcessingStatus.ERROR && (
               <div className="p-4 bg-red-50 text-red-700 rounded-xl flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" /> 
-                <span className="text-sm font-medium">Analysis failed. Try a different file.</span>
+                <span className="text-sm font-medium">{t('imageView.error')}</span>
               </div>
             )}
 

@@ -5,6 +5,7 @@ import ImageView from './components/ImageView';
 import LoginModal from './components/LoginView';
 import { sendChatMessage } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
+import { LanguageProvider, useLanguage } from './i18n';
 import { 
   LayoutDashboard, 
   FileSearch, 
@@ -20,11 +21,14 @@ import {
   LogIn,
   Loader2,
   Cpu,
-  FileText
+  FileText,
+  Globe
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-const App: React.FC = () => {
+// Create a wrapper component to handle the inner logic that needs useLanguage
+const MainApp: React.FC = () => {
+  const { t, language, setLanguage } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -33,17 +37,28 @@ const App: React.FC = () => {
   const [modelProvider, setModelProvider] = useState<ModelProvider>('gemini');
   
   // Chat State
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      role: 'model',
-      text: 'Hello! I am your Financial Audit Assistant. Ask me about accounting standards, tax compliance, or help interpreting your financial data.',
-      timestamp: new Date()
-    }
-  ]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const hasInitializedChat = useRef(false);
+
+  // Initialize Chat History based on language
+  useEffect(() => {
+    if (!hasInitializedChat.current) {
+      setChatHistory([
+        {
+          id: '1',
+          role: 'model',
+          text: t('chat.initialMessage'),
+          timestamp: new Date()
+        }
+      ]);
+      hasInitializedChat.current = true;
+    }
+  }, [t]); // We only want this to run once or when t becomes available, but logical constraints mean we might just let it be. 
+  // Ideally for real language switching mid-chat we don't clear history, so we leave it as is. 
+  // If the user switches language, new messages will be in new language.
 
   useEffect(() => {
     const checkSession = async () => {
@@ -124,7 +139,7 @@ const App: React.FC = () => {
     setIsChatLoading(true);
 
     try {
-      const responseText = await sendChatMessage(chatHistory, userMsg.text, modelProvider);
+      const responseText = await sendChatMessage(chatHistory, userMsg.text, modelProvider, language);
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
@@ -191,7 +206,7 @@ const App: React.FC = () => {
                 <input
                   type="text"
                   className="flex-1 border border-slate-300 bg-slate-50 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-base md:text-sm"
-                  placeholder={session ? `Ask ${getBotName()}...` : "Log in to chat..."}
+                  placeholder={session ? `${t('chat.placeholder')} (${getBotName()})...` : t('chat.loginPlaceholder')}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={!session}
@@ -202,7 +217,7 @@ const App: React.FC = () => {
                   type="submit"
                   disabled={!chatInput.trim() || isChatLoading}
                   className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white p-3 rounded-full transition-all disabled:opacity-50 flex-shrink-0 shadow-sm"
-                  title={!session ? "Login required" : "Send"}
+                  title={!session ? t('nav.loginRequired') : "Send"}
                   onClick={(e) => {
                     if (!session) {
                       e.preventDefault();
@@ -228,8 +243,8 @@ const App: React.FC = () => {
                 <div className="bg-white/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
                   <FileSearch className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-bold mb-2">Analyze Data</h3>
-                <p className="text-indigo-100 text-sm">Paste CSV or financial text for instant anomaly detection.</p>
+                <h3 className="text-xl font-bold mb-2">{t('dashboard.analyzeDataTitle')}</h3>
+                <p className="text-indigo-100 text-sm">{t('dashboard.analyzeDataDesc')}</p>
               </div>
 
               <div 
@@ -239,8 +254,8 @@ const App: React.FC = () => {
                 <div className="bg-emerald-50 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
                   <FileText className="w-6 h-6 text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Document Scan</h3>
-                <p className="text-slate-500 text-sm">Upload invoices, receipts, or PDF documents for forensic integrity checks.</p>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">{t('dashboard.docScanTitle')}</h3>
+                <p className="text-slate-500 text-sm">{t('dashboard.docScanDesc')}</p>
               </div>
 
               <div 
@@ -250,32 +265,31 @@ const App: React.FC = () => {
                 <div className="bg-blue-50 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
                   <MessageSquareText className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Consult Assistant</h3>
-                <p className="text-slate-500 text-sm">Chat with the AI about accounting standards and compliance.</p>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">{t('dashboard.consultTitle')}</h3>
+                <p className="text-slate-500 text-sm">{t('dashboard.consultDesc')}</p>
               </div>
             </div>
 
             <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                  <ShieldCheck className="w-8 h-8 text-indigo-600" />
-                 <h2 className="text-2xl font-bold text-slate-800">Ready to Audit</h2>
+                 <h2 className="text-2xl font-bold text-slate-800">{t('dashboard.readyToAudit')}</h2>
               </div>
               <p className="text-slate-600 max-w-2xl leading-relaxed">
-                Welcome to AuditAI. This tool leverages advanced reasoning models to assist financial professionals. 
-                Start by selecting a module above. Ensure all data provided is anonymized where possible for security best practices.
+                {t('dashboard.welcomeText')}
               </p>
               
               {!session && (
                  <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-indigo-900 text-center sm:text-left">Sign in to get started</p>
-                      <p className="text-sm text-indigo-700 text-center sm:text-left">Authentication is required to use AI features.</p>
+                      <p className="font-semibold text-indigo-900 text-center sm:text-left">{t('dashboard.loginPromptTitle')}</p>
+                      <p className="text-sm text-indigo-700 text-center sm:text-left">{t('dashboard.loginPromptDesc')}</p>
                     </div>
                     <button 
                       onClick={requireLogin}
                       className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors font-medium shadow-sm"
                     >
-                      Sign In
+                      {t('nav.signIn')}
                     </button>
                  </div>
               )}
@@ -316,7 +330,7 @@ const App: React.FC = () => {
              <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
                <ShieldCheck className="w-6 h-6 text-white" />
              </div>
-             AuditAI
+             {t('appTitle')}
           </div>
           <button 
             onClick={() => setIsMobileMenuOpen(false)} 
@@ -328,10 +342,10 @@ const App: React.FC = () => {
 
         <nav className="px-4 py-4 space-y-2">
           {[
-            { view: ViewState.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
-            { view: ViewState.AUDIT_TEXT, icon: FileSearch, label: 'Data Analysis' },
-            { view: ViewState.AUDIT_IMAGE, icon: ScanLine, label: 'Document Scan' },
-            { view: ViewState.CHAT, icon: MessageSquareText, label: 'AI Assistant' },
+            { view: ViewState.DASHBOARD, icon: LayoutDashboard, label: t('nav.dashboard') },
+            { view: ViewState.AUDIT_TEXT, icon: FileSearch, label: t('nav.auditText') },
+            { view: ViewState.AUDIT_IMAGE, icon: ScanLine, label: t('nav.auditImage') },
+            { view: ViewState.CHAT, icon: MessageSquareText, label: t('nav.chat') },
           ].map((item) => (
             <button 
               key={item.view}
@@ -363,7 +377,7 @@ const App: React.FC = () => {
               <button 
                 onClick={handleLogout}
                 className="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition-colors"
-                title="Sign Out"
+                title={t('nav.signOut')}
               >
                 <LogOut className="w-5 h-5" />
               </button>
@@ -374,7 +388,7 @@ const App: React.FC = () => {
               className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3.5 rounded-xl transition-colors border border-slate-700 font-medium active:scale-95"
             >
               <LogIn className="w-4 h-4" />
-              Sign In
+              {t('nav.signIn')}
             </button>
           )}
         </div>
@@ -391,17 +405,27 @@ const App: React.FC = () => {
               <Menu className="w-6 h-6" />
             </button>
             <h1 className="text-lg font-bold text-slate-800 truncate max-w-[180px] sm:max-w-none">
-              {currentView === ViewState.DASHBOARD && 'Overview'}
-              {currentView === ViewState.AUDIT_TEXT && 'Data Audit'}
-              {currentView === ViewState.AUDIT_IMAGE && 'Doc Audit'}
-              {currentView === ViewState.CHAT && 'AI Assistant'}
+              {currentView === ViewState.DASHBOARD && t('dashboard.overview')}
+              {currentView === ViewState.AUDIT_TEXT && t('nav.auditText')}
+              {currentView === ViewState.AUDIT_IMAGE && t('nav.auditImage')}
+              {currentView === ViewState.CHAT && t('nav.chat')}
             </h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* Language Toggle */}
+             <button
+              onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors"
+              title="Switch Language"
+            >
+              <Globe className="w-4 h-4" />
+              <span className="text-xs font-semibold">{language === 'en' ? 'EN' : '中文'}</span>
+            </button>
+
             {/* Model Selector */}
             <div className="flex items-center gap-2 bg-slate-50 px-2 md:px-3 py-1.5 rounded-lg border border-slate-200">
               <Cpu className="w-4 h-4 text-slate-500" />
-              <span className="text-xs font-medium text-slate-500 hidden sm:inline">Model:</span>
+              <span className="text-xs font-medium text-slate-500 hidden sm:inline">{t('dashboard.modelLabel')}</span>
               <select 
                 value={modelProvider}
                 onChange={(e) => setModelProvider(e.target.value as ModelProvider)}
@@ -428,6 +452,15 @@ const App: React.FC = () => {
         </div>
       </main>
     </div>
+  );
+};
+
+// Export the App wrapped in LanguageProvider
+const App: React.FC = () => {
+  return (
+    <LanguageProvider>
+      <MainApp />
+    </LanguageProvider>
   );
 };
 
