@@ -93,6 +93,9 @@ export const translations = {
       loginPlaceholder: "Log in to chat...",
       initialMessage: "Hello! I am your Financial Audit Assistant. Ask me about accounting standards, tax compliance, or help interpreting your financial data.",
       modelName: "Assistant"
+    },
+    footer: {
+      copyright: "Copyright © 2026 Hainan Zhouyuan Information Technology Co., Ltd."
     }
   },
   zh: {
@@ -185,6 +188,9 @@ export const translations = {
       loginPlaceholder: "登录后聊天...",
       initialMessage: "你好！我是你的财务审计助手。你可以问我关于会计准则、税务合规的问题，或者让我帮你解读财务数据。",
       modelName: "助手"
+    },
+    footer: {
+      copyright: "版权所有 海南宙元信息技术有限公司 © 2026"
     }
   }
 };

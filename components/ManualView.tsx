@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 const ManualView: React.FC = () => {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const content = {
     en: {
@@ -177,7 +177,7 @@ const ManualView: React.FC = () => {
     }
   };
 
-  const t = content[language];
+  const manualContent = content[language];
 
   return (
     <div className="animate-fade-in pb-12">
@@ -192,13 +192,13 @@ const ManualView: React.FC = () => {
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-indigo-200 mb-6">
               <BookOpen className="w-3 h-3" />
-              {t.hero.badge}
+              {manualContent.hero.badge}
             </div>
             <h1 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight leading-tight">
-              {t.hero.title}
+              {manualContent.hero.title}
             </h1>
             <p className="text-indigo-100 text-lg md:text-xl max-w-2xl leading-relaxed opacity-90">
-              {t.hero.subtitle}
+              {manualContent.hero.subtitle}
             </p>
           </div>
         </div>
@@ -207,10 +207,10 @@ const ManualView: React.FC = () => {
         <div className="px-2">
           <div className="flex items-center gap-2 mb-6">
             <Zap className="w-6 h-6 text-amber-500" />
-            <h2 className="text-2xl font-bold text-slate-800">{t.quickStart.title}</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{manualContent.quickStart.title}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {t.quickStart.steps.map((step, idx) => (
+            {manualContent.quickStart.steps.map((step, idx) => (
               <div key={idx} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative group hover:shadow-md transition-all hover:border-indigo-200">
                 <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   {idx + 1}
@@ -235,7 +235,7 @@ const ManualView: React.FC = () => {
              {language === 'zh' ? '核心功能详解' : 'Core Features'}
            </h2>
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {t.features.map((feature) => (
+             {manualContent.features.map((feature) => (
                <div key={feature.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300">
                  <div className={`p-6 ${feature.bg} border-b border-slate-100`}>
                    <feature.icon className={`w-10 h-10 ${feature.color} mb-4`} />
@@ -267,10 +267,10 @@ const ManualView: React.FC = () => {
           <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
               <Cpu className="w-6 h-6 text-slate-600" />
-              {t.settings.title}
+              {manualContent.settings.title}
             </h3>
             <div className="space-y-6">
-              {t.settings.items.map((item, idx) => (
+              {manualContent.settings.items.map((item, idx) => (
                 <div key={idx} className="flex gap-4">
                   <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0">
                     <item.icon className="w-5 h-5 text-slate-600" />
@@ -288,10 +288,10 @@ const ManualView: React.FC = () => {
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 md:p-8 rounded-2xl border border-amber-100 shadow-sm">
             <h3 className="text-xl font-bold text-amber-900 mb-6 flex items-center gap-2">
               <HelpCircle className="w-6 h-6 text-amber-600" />
-              {t.tips.title}
+              {manualContent.tips.title}
             </h3>
             <div className="space-y-4">
-              {t.tips.list.map((tip, idx) => (
+              {manualContent.tips.list.map((tip, idx) => (
                 <div key={idx} className="flex gap-3 bg-white/60 p-3 rounded-lg border border-amber-100/50">
                   <span className="text-amber-500 font-bold">💡</span>
                   <p className="text-sm text-amber-900/80 leading-relaxed font-medium">{tip}</p>
@@ -304,7 +304,7 @@ const ManualView: React.FC = () => {
 
         {/* Footer */}
         <div className="text-center text-slate-400 text-sm py-8 border-t border-slate-200 mx-2">
-          AuditAI Documentation &copy; {new Date().getFullYear()}
+          {t('footer.copyright')}
         </div>
 
       </div>
