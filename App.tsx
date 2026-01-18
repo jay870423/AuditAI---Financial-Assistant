@@ -135,21 +135,51 @@ const MainApp: React.FC = () => {
       timestamp: new Date()
     };
 
+    // 1. Add User Message
     setChatHistory(prev => [...prev, userMsg]);
     setChatInput('');
     setIsChatLoading(true);
 
+    // 2. Add Placeholder Bot Message immediately
+    const botMsgId = (Date.now() + 1).toString();
+    const botPlaceholderMsg: ChatMessage = {
+      id: botMsgId,
+      role: 'model',
+      text: '', // Start empty
+      timestamp: new Date()
+    };
+    setChatHistory(prev => [...prev, botPlaceholderMsg]);
+
     try {
-      const responseText = await sendChatMessage(chatHistory, userMsg.text, modelProvider, language);
-      const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: responseText,
-        timestamp: new Date()
-      };
-      setChatHistory(prev => [...prev, botMsg]);
+      // 3. Call Service with onChunk callback
+      await sendChatMessage(
+        chatHistory, 
+        userMsg.text, 
+        modelProvider, 
+        language,
+        (streamedText) => {
+          // Update the specific message in history with new text
+          setChatHistory(prev => {
+            const newHistory = [...prev];
+            const msgIndex = newHistory.findIndex(m => m.id === botMsgId);
+            if (msgIndex !== -1) {
+              newHistory[msgIndex] = { ...newHistory[msgIndex], text: streamedText };
+            }
+            return newHistory;
+          });
+        }
+      );
     } catch (error) {
       console.error(error);
+      // Optional: Update message to show error
+      setChatHistory(prev => {
+        const newHistory = [...prev];
+        const msgIndex = newHistory.findIndex(m => m.id === botMsgId);
+        if (msgIndex !== -1) {
+          newHistory[msgIndex] = { ...newHistory[msgIndex], text: "Sorry, something went wrong." };
+        }
+        return newHistory;
+      });
     } finally {
       setIsChatLoading(false);
     }
@@ -181,25 +211,13 @@ const MainApp: React.FC = () => {
                         ? 'bg-indigo-600 text-white rounded-tr-none' 
                         : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
                     }`}>
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      {/* Only use ReactMarkdown if text is complete or substantial to avoid flicker on small chunks */}
+                      <ReactMarkdown>{msg.text || (msg.role === 'model' && isChatLoading && msg.id === chatHistory[chatHistory.length-1].id ? '...' : '')}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
               ))}
-              {isChatLoading && (
-                <div className="flex justify-start">
-                   <div className="flex gap-3 max-w-[80%]">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getBotIconColor()}`}>
-                      <Bot className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="p-4 bg-white border border-slate-200 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                    </div>
-                   </div>
-                </div>
-              )}
+              
               <div ref={chatEndRef} />
             </div>
             
@@ -228,7 +246,7 @@ const MainApp: React.FC = () => {
                     }
                   }}
                 >
-                  <Send className="w-5 h-5" />
+                  {isChatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
               </form>
             </div>

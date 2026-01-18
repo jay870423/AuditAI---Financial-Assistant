@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { AuditAnalysisResult, ChatMessage, ModelProvider, AuditScenario } from "../types";
 import { Language } from "../i18n";
 
@@ -49,10 +49,17 @@ interface OpenAIConfig {
   jsonMode?: boolean;
 }
 
-const callOpenAICompatible = async (messages: any[], systemInstruction: string | undefined, config: OpenAIConfig) => {
+const callOpenAICompatible = async (
+  messages: any[], 
+  systemInstruction: string | undefined, 
+  config: OpenAIConfig,
+  onChunk?: (text: string) => void
+) => {
   if (!config.apiKey) {
     throw new Error(`${config.providerName} API Key is missing. Please check your environment variables.`);
   }
+
+  const isStreaming = !!onChunk;
 
   const payload: any = {
     model: config.model,
@@ -60,7 +67,7 @@ const callOpenAICompatible = async (messages: any[], systemInstruction: string |
       ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
       ...messages
     ],
-    stream: false,
+    stream: isStreaming,
     temperature: 0.0 // Low temperature for analytical tasks
   };
 
@@ -82,6 +89,42 @@ const callOpenAICompatible = async (messages: any[], systemInstruction: string |
     throw new Error(`${config.providerName} API Error: ${response.status} - ${errorText}`);
   }
 
+  // Handle Streaming Response
+  if (isStreaming && onChunk && response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let accumulatedText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || trimmedLine === "data: [DONE]") continue;
+        
+        if (trimmedLine.startsWith("data: ")) {
+          try {
+            const jsonStr = trimmedLine.replace("data: ", "");
+            const json = JSON.parse(jsonStr);
+            const deltaContent = json.choices?.[0]?.delta?.content || "";
+            if (deltaContent) {
+              accumulatedText += deltaContent;
+              onChunk(accumulatedText);
+            }
+          } catch (e) {
+            console.warn("Error parsing stream chunk", e);
+          }
+        }
+      }
+    }
+    return accumulatedText;
+  }
+
+  // Handle Standard Response
   const data = await response.json();
   return data.choices[0]?.message?.content || "";
 };
@@ -331,9 +374,15 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
 };
 
 /**
- * Chat functionality for financial context.
+ * Chat functionality for financial context with streaming support.
  */
-export const sendChatMessage = async (history: ChatMessage[], newMessage: string, provider: ModelProvider = 'gemini', language: Language = 'en'): Promise<string> => {
+export const sendChatMessage = async (
+  history: ChatMessage[], 
+  newMessage: string, 
+  provider: ModelProvider = 'gemini', 
+  language: Language = 'en',
+  onChunk?: (text: string) => void
+): Promise<string> => {
   // Define language-specific personas for better context
   let systemInstruction: string;
   
@@ -367,14 +416,14 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
     messages.push({ role: 'user', content: newMessage });
     
     try {
-      return await callOpenAICompatible(messages, systemInstruction, config);
+      return await callOpenAICompatible(messages, systemInstruction, config, onChunk);
     } catch (error) {
        console.error(`${config.providerName} Chat Error:`, error);
        return `Sorry, I encountered an error connecting to ${config.providerName}.`;
     }
   }
 
-  // --- Gemini Implementation ---
+  // --- Gemini Implementation (Streaming) ---
   const formattedHistory = history.map(msg => ({
     role: msg.role,
     parts: [{ text: msg.text }]
@@ -389,8 +438,23 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
   });
 
   try {
-    const result = await chat.sendMessage({ message: newMessage });
-    return result.text || "I'm not sure how to answer that.";
+    if (onChunk) {
+      const result = await chat.sendMessageStream({ message: newMessage });
+      let accumulatedText = "";
+      
+      for await (const chunk of result) {
+        const c = chunk as GenerateContentResponse;
+        const text = c.text;
+        if (text) {
+          accumulatedText += text;
+          onChunk(accumulatedText);
+        }
+      }
+      return accumulatedText;
+    } else {
+      const result = await chat.sendMessage({ message: newMessage });
+      return result.text || "I'm not sure how to answer that.";
+    }
   } catch (error) {
     console.error("Chat Error:", error);
     return "Sorry, I encountered an error connecting to the service.";
