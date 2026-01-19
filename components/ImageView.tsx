@@ -125,10 +125,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
   };
 
   const handleAnalyze = async () => {
-    if (!session) {
-      onRequireLogin();
-      return;
-    }
+    // Login check removed to allow public access
     if (!selectedFile) return;
     setStatus(ProcessingStatus.PROCESSING);
     try {
@@ -287,12 +284,6 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
                      </div>
                 </div>
 
-                {!session && (
-                  <div className="flex items-center justify-center gap-2 text-amber-600 text-sm bg-amber-50 px-3 py-2.5 rounded-lg border border-amber-100">
-                    <Lock className="w-4 h-4" />
-                    {t('nav.loginRequired')}
-                  </div>
-                )}
                 <button
                   onClick={handleAnalyze}
                   disabled={status === ProcessingStatus.PROCESSING}

@@ -32,7 +32,7 @@ const ManualView: React.FC = () => {
       quickStart: {
         title: "Quick Start Workflow",
         steps: [
-          { title: "Sign In", desc: "Log in via Google or GitHub to unlock AI features." },
+          { title: "Access App", desc: "Open the app and start using AI features immediately (Login optional)." },
           { title: "Select Module", desc: "Choose Data Analysis, Doc Scan, or Chat." },
           { title: "Input Data", desc: "Upload Excel, photos, or ask questions." },
           { title: "Get Results", desc: "View risks, charts, and export reports." }
@@ -108,7 +108,7 @@ const ManualView: React.FC = () => {
       quickStart: {
         title: "快速上手流程",
         steps: [
-          { title: "登录账户", desc: "使用 Google 或 GitHub 登录以解锁 AI 功能。" },
+          { title: "直接使用", desc: "无需登录即可使用所有 AI 功能（登录为可选）。" },
           { title: "选择模块", desc: "选择数据分析、凭证扫描或 AI 助手。" },
           { title: "输入数据", desc: "上传 Excel、拍摄单据或提问。" },
           { title: "获取结果", desc: "查看风险提示、图表并导出报告。" }

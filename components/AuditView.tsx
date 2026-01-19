@@ -23,10 +23,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAudit = async () => {
-    if (!session) {
-      onRequireLogin();
-      return;
-    }
+    // Login check removed to allow public access
     if (!inputText.trim()) return;
     setStatus(ProcessingStatus.PROCESSING);
     setResult(null);
@@ -195,17 +192,10 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
                <ScanSearch className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
              </div>
           </div>
-
-          {!session && (
-            <div className="w-full sm:w-auto flex items-center justify-center gap-2 text-amber-600 text-sm bg-amber-50 px-3 py-2.5 rounded-lg border border-amber-100">
-              <Lock className="w-4 h-4" />
-              {t('nav.loginRequired')}
-            </div>
-          )}
           
           <button
             onClick={handleAudit}
-            disabled={status === ProcessingStatus.PROCESSING || (!inputText.trim() && !!session)}
+            disabled={status === ProcessingStatus.PROCESSING || !inputText.trim()}
             className={`w-full sm:w-auto sm:ml-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-sm ${modelProvider === 'deepseek' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
           >
             {status === ProcessingStatus.PROCESSING ? (

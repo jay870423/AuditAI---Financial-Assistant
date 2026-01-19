@@ -122,10 +122,7 @@ const MainApp: React.FC = () => {
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session) {
-      requireLogin();
-      return;
-    }
+    // Login check removed to allow public access
     if (!chatInput.trim() || isChatLoading) return;
 
     const userMsg: ChatMessage = {
@@ -227,10 +224,9 @@ const MainApp: React.FC = () => {
                 <input
                   type="text"
                   className="flex-1 border border-slate-300 bg-slate-50 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-base md:text-sm"
-                  placeholder={session ? `${t('chat.placeholder')} (${getBotName()})...` : t('chat.loginPlaceholder')}
+                  placeholder={`${t('chat.placeholder')} (${getBotName()})...`}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  disabled={!session}
                   // Prevent iOS zoom on focus
                   style={{ fontSize: '16px' }} 
                 />
@@ -238,13 +234,7 @@ const MainApp: React.FC = () => {
                   type="submit"
                   disabled={!chatInput.trim() || isChatLoading}
                   className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white p-3 rounded-full transition-all disabled:opacity-50 flex-shrink-0 shadow-sm"
-                  title={!session ? t('nav.loginRequired') : "Send"}
-                  onClick={(e) => {
-                    if (!session) {
-                      e.preventDefault();
-                      requireLogin();
-                    }
-                  }}
+                  title="Send"
                 >
                   {isChatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
@@ -299,21 +289,6 @@ const MainApp: React.FC = () => {
               <p className="text-slate-600 max-w-2xl leading-relaxed">
                 {t('dashboard.welcomeText')}
               </p>
-              
-              {!session && (
-                 <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-indigo-900 text-center sm:text-left">{t('dashboard.loginPromptTitle')}</p>
-                      <p className="text-sm text-indigo-700 text-center sm:text-left">{t('dashboard.loginPromptDesc')}</p>
-                    </div>
-                    <button 
-                      onClick={requireLogin}
-                      className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors font-medium shadow-sm"
-                    >
-                      {t('nav.signIn')}
-                    </button>
-                 </div>
-              )}
             </div>
           </div>
         );
