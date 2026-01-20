@@ -7,17 +7,18 @@ const deepSeekApiKey = process.env.DEEPSEEK_API_KEY || '';
 const openAiApiKey = process.env.OPENAI_API_KEY || '';
 const qwenApiKey = process.env.DASHSCOPE_API_KEY || '';
 
-// --- PROXY CONFIGURATION (Critical for China Access) ---
-// We use a relative path '/gemini-api'.
-// In Local Dev: Vite proxies this to googleapis.com
-// In Production: Vercel rewrites this to googleapis.com
+// --- PROXY CONFIGURATION ---
 const GEMINI_PROXY_BASE = '/gemini-api';
 const GEMINI_API_VERSION = 'v1beta';
 
 // Helper: Get full Gemini URL via Proxy
-const getGeminiUrl = (model: string, method: string): string => {
-  // Final URL: /gemini-api/v1beta/models/gemini-3-flash-preview:generateContent?key=...
-  return `${GEMINI_PROXY_BASE}/${GEMINI_API_VERSION}/models/${model}:${method}?key=${apiKey}`;
+// Added 'sse' support for chat streaming
+const getGeminiUrl = (model: string, method: string, isStreaming: boolean = false): string => {
+  let url = `${GEMINI_PROXY_BASE}/${GEMINI_API_VERSION}/models/${model}:${method}?key=${apiKey}`;
+  if (isStreaming) {
+    url += '&alt=sse'; // Use Server-Sent Events for reliable streaming
+  }
+  return url;
 };
 
 // Helper: Convert File to Base64
@@ -37,7 +38,7 @@ export const fileToGenerativePart = async (file: File): Promise<{ mimeType: stri
   });
 };
 
-// Helper: File to Data URL (for OpenAI/Qwen)
+// Helper: File to Data URL
 const fileToDataUrl = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -47,8 +48,7 @@ const fileToDataUrl = async (file: File): Promise<string> => {
   });
 };
 
-// --- Generic OpenAI Compatible Caller (DeepSeek, GPT, Qwen) ---
-// (Kept same as before, skipping for brevity but included in full file)
+// --- Generic OpenAI Compatible Caller ---
 interface OpenAIConfig {
   apiKey: string;
   baseUrl: string;
@@ -63,9 +63,7 @@ const callOpenAICompatible = async (
   config: OpenAIConfig,
   onChunk?: (text: string) => void
 ) => {
-  if (!config.apiKey) {
-    throw new Error(`${config.providerName} API Key is missing.`);
-  }
+  if (!config.apiKey) throw new Error(`${config.providerName} API Key is missing.`);
 
   const isStreaming = !!onChunk;
   const payload: any = {
@@ -80,6 +78,8 @@ const callOpenAICompatible = async (
 
   if (config.jsonMode) payload.response_format = { type: "json_object" };
 
+  console.log(`[AuditAI] Calling ${config.providerName}...`);
+
   const response = await fetch(config.baseUrl, {
     method: "POST",
     headers: {
@@ -91,7 +91,8 @@ const callOpenAICompatible = async (
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`${config.providerName} API Error: ${response.status} - ${errorText}`);
+    console.error(`[AuditAI] ${config.providerName} Error:`, errorText);
+    throw new Error(`${config.providerName} Error (${response.status}): ${errorText}`);
   }
 
   if (isStreaming && onChunk && response.body) {
@@ -115,7 +116,7 @@ const callOpenAICompatible = async (
               accumulatedText += delta;
               onChunk(accumulatedText);
             }
-          } catch (e) { console.warn("Stream parse error", e); }
+          } catch (e) { /* ignore parse errors in stream */ }
         }
       }
     }
@@ -126,47 +127,28 @@ const callOpenAICompatible = async (
   return data.choices[0]?.message?.content || "";
 };
 
-// Provider Config Helper
 const getProviderConfig = (provider: ModelProvider, jsonMode: boolean = false): OpenAIConfig | null => {
   switch (provider) {
     case 'deepseek':
-      return {
-        apiKey: deepSeekApiKey,
-        baseUrl: "https://api.deepseek.com/chat/completions",
-        model: "deepseek-chat",
-        providerName: "DeepSeek",
-        jsonMode
-      };
+      return { apiKey: deepSeekApiKey, baseUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-chat", providerName: "DeepSeek", jsonMode };
     case 'gpt':
       const gptBase = process.env.OPENAI_BASE_URL || (typeof window !== 'undefined' ? `${window.location.origin}/openai-api/v1/chat/completions` : "https://api.openai.com/v1/chat/completions");
-      return {
-        apiKey: openAiApiKey,
-        baseUrl: gptBase,
-        model: "gpt-4o",
-        providerName: "OpenAI (GPT-4o)",
-        jsonMode
-      };
+      return { apiKey: openAiApiKey, baseUrl: gptBase, model: "gpt-4o", providerName: "OpenAI", jsonMode };
     case 'qwen':
-      return {
-        apiKey: qwenApiKey,
-        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-        model: "qwen-max",
-        providerName: "Qwen",
-        jsonMode
-      };
+      return { apiKey: qwenApiKey, baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-max", providerName: "Qwen", jsonMode };
     default: return null;
   }
 };
 
-// --- CORE GEMINI LOGIC (DIRECT FETCH) ---
+// --- GEMINI IMPLEMENTATION ---
 
 const getScenarioInstruction = (scenario: AuditScenario, langInstruction: string): string => {
   const base = `You are a professional auditor. Output language: ${langInstruction}.`;
   switch (scenario) {
-    case 'fraud': return `${base} Focus on FRAUD DETECTION. Look for round number anomalies, weekend transactions, duplicate payments.`;
-    case 'tax': return `${base} Focus on TAX COMPLIANCE. Identify non-deductible expenses, VAT issues.`;
-    case 'compliance': return `${base} Focus on INTERNAL CONTROLS. Flag unauthorized spending, split transactions.`;
-    case 'general': default: return `${base} Provide a balanced financial overview.`;
+    case 'fraud': return `${base} Focus on FRAUD DETECTION. Look for round number anomalies, weekend transactions.`;
+    case 'tax': return `${base} Focus on TAX COMPLIANCE. Identify non-deductible expenses.`;
+    case 'compliance': return `${base} Focus on INTERNAL CONTROLS.`;
+    default: return `${base} Provide a balanced financial overview.`;
   }
 };
 
@@ -175,12 +157,11 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
   const systemInstruction = getScenarioInstruction(scenario, langInstruction);
   
   const promptText = `
-    Analyze the following financial text/CSV data.
-    Data:
+    Analyze the following financial data:
     ${data}
 
-    Output must be valid JSON matching this structure. 
-    IMPORTANT: The values for 'summary', 'description', 'recommendation', 'label', 'category', 'change' MUST be in ${langInstruction}.
+    Output valid JSON matching this structure. 
+    Values for 'summary', 'description', 'recommendation', 'label', 'category', 'change' MUST be in ${langInstruction}.
     
     JSON Structure:
     {
@@ -198,18 +179,19 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
     return JSON.parse(res.replace(/```json\n?|\n?```/g, ''));
   }
 
-  // 2. Gemini Direct Fetch
+  // 2. Gemini
   if (!apiKey) throw new Error("Gemini API Key is missing.");
 
   const model = "gemini-3-flash-preview";
   const url = getGeminiUrl(model, "generateContent");
+
+  console.log(`[AuditAI] Requesting Gemini Analysis: ${url}`);
 
   const payload = {
     contents: [{ parts: [{ text: promptText }] }],
     systemInstruction: { parts: [{ text: systemInstruction }] },
     generationConfig: {
       responseMimeType: "application/json",
-      // Schema definition for Gemini JSON mode
       responseSchema: {
         type: "OBJECT",
         properties: {
@@ -255,21 +237,21 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Gemini API Error: ${response.status} - ${err}`);
+    const errText = await response.text();
+    console.error("[AuditAI] Gemini API Error:", errText);
+    throw new Error(`Gemini Error (${response.status}): ${errText}`);
   }
 
   const json = await response.json();
   const textResult = json.candidates?.[0]?.content?.parts?.[0]?.text;
   
-  if (!textResult) throw new Error("Empty response from Gemini");
+  if (!textResult) throw new Error("Gemini returned empty response.");
   return JSON.parse(textResult);
 };
 
 export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 'gemini', language: Language = 'en', scenario: AuditScenario = 'general'): Promise<string> => {
   const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
-  
-  const prompt = `Perform a forensic audit on this document image. Scenario: ${scenario}. Language: ${langInstruction}. Format as Markdown.`;
+  const prompt = `Perform a forensic audit on this image. Scenario: ${scenario}. Language: ${langInstruction}. Format as Markdown.`;
 
   // 1. OpenAI Compatible
   if (provider === 'gpt' || provider === 'qwen') {
@@ -282,13 +264,14 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
     }
   }
 
-  // 2. Gemini Direct Fetch
+  // 2. Gemini
   if (!apiKey) throw new Error("Gemini API Key missing.");
   
-  // Note: Gemini text model usually supports images too in recent versions, but flash-image is safer or just flash.
   const model = "gemini-3-flash-preview"; 
   const url = getGeminiUrl(model, "generateContent");
   
+  console.log(`[AuditAI] Requesting Gemini Vision: ${url}`);
+
   const { mimeType, data } = await fileToGenerativePart(file);
 
   const payload = {
@@ -307,8 +290,9 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Gemini Vision Error: ${response.status} - ${err}`);
+    const errText = await response.text();
+    console.error("[AuditAI] Gemini Vision Error:", errText);
+    throw new Error(`Gemini Vision Error (${response.status}): ${errText}`);
   }
 
   const json = await response.json();
@@ -322,7 +306,7 @@ export const sendChatMessage = async (
   language: Language = 'en',
   onChunk?: (text: string) => void
 ): Promise<string> => {
-  let systemInstruction = language === 'zh' 
+  const systemInstruction = language === 'zh' 
     ? `你是一名专业的财务审计顾问 (AuditAI)。请根据会计准则回答，保持专业。` 
     : `You are a professional financial audit consultant (AuditAI). Answer based on accounting standards.`;
 
@@ -331,18 +315,17 @@ export const sendChatMessage = async (
   if (config) {
     const messages = history.map(msg => ({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.text }));
     messages.push({ role: 'user', content: newMessage });
-    try {
-      return await callOpenAICompatible(messages, systemInstruction, config, onChunk);
-    } catch (e) { console.error(e); throw e; }
+    return await callOpenAICompatible(messages, systemInstruction, config, onChunk);
   }
 
-  // 2. Gemini Direct Fetch (Streaming)
+  // 2. Gemini (SSE Streaming)
   if (!apiKey) throw new Error("Gemini API Key is missing.");
   
   const model = "gemini-3-flash-preview";
-  // Use streamGenerateContent?alt=sse for easier parsing, or standard JSON stream
-  // We will use standard JSON stream which is default for streamGenerateContent
-  const url = getGeminiUrl(model, "streamGenerateContent");
+  // CRITICAL: Use alt=sse for robust streaming
+  const url = getGeminiUrl(model, "streamGenerateContent", true);
+
+  console.log(`[AuditAI] Requesting Gemini Chat (SSE): ${url}`);
 
   const contents = history.map(msg => ({
     role: msg.role,
@@ -362,93 +345,45 @@ export const sendChatMessage = async (
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Gemini Chat Error: ${response.status} - ${err}`);
+    const errText = await response.text();
+    console.error("[AuditAI] Gemini Chat Error:", errText);
+    throw new Error(`Gemini Chat Error (${response.status}): ${errText}`);
   }
 
+  // Handle SSE Streaming (Robust)
   if (onChunk && response.body) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let accumulatedText = "";
-    let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
       
-      // Gemini sends a JSON array like [{...}, {...}] but often chunks are incomplete JSON
-      // It's safer to look for "text" fields in the raw buffer if simple JSON parsing fails, 
-      // but a proper parser handles braces.
-      // Quick hack for Gemini stream: usually objects come in [ { ... },\n { ... } ]
-      // We'll simplisticly parse complete JSON objects from the buffer.
-      
-      // NOTE: Gemini Rest API stream output looks like:
-      // [{
-      //   "candidates": [...]
-      // },
-      // {
-      //   "candidates": [...]
-      // }]
-      // It starts with '[' and sends objects separated by commas.
-      
-      // Regex approach to extract "text": "..."
-      // This is fragile but works for simple text streaming without full JSON parser state machine.
-      // A better way is to split by "candidates" if possible.
-      
-      // Let's try to extract text content more robustly from the raw chunks
-      // The chunks usually contain: "parts": [{"text": "HERE IS CONTENT"}]
-      
-      // Simple loop to extract all text occurrences we haven't processed yet
-      // This avoids JSON parse errors on partial chunks.
-      const regex = /"text":\s*"((?:[^"\\]|\\.)*)"/g;
-      let match;
-      
-      // We need to keep track of where we last matched to avoid re-reading
-      // For simplicity in this demo, we re-scan the buffer but only add *new* length
-      // Actually, standard way: Just accumulate text from valid JSONs.
-      // Since manual stream parsing is complex, for this demo we might fallback to non-streaming 
-      // IF reliability is key, but the user asked for streaming.
-      
-      // Let's try a balanced brace parser for the array elements.
-      let bracketCount = 0;
-      let startIndex = -1;
-      
-      for (let i = 0; i < buffer.length; i++) {
-        if (buffer[i] === '{') {
-          if (bracketCount === 0) startIndex = i;
-          bracketCount++;
-        } else if (buffer[i] === '}') {
-          bracketCount--;
-          if (bracketCount === 0 && startIndex !== -1) {
-            // Found a complete object
-            const jsonStr = buffer.substring(startIndex, i + 1);
-            try {
-              const json = JSON.parse(jsonStr);
-              const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text) {
-                accumulatedText += text;
-                onChunk(accumulatedText);
-              }
-              // Remove processed part from buffer
-              // (Wait, we can't modify buffer while iterating. We'll reconstruct.)
-            } catch (e) { /* ignore partials */ }
-            startIndex = -1; // Reset
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.slice(6); // remove 'data: '
+          if (jsonStr.trim() === '[DONE]') continue;
+          
+          try {
+            const json = JSON.parse(jsonStr);
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              accumulatedText += text;
+              onChunk(accumulatedText);
+            }
+          } catch (e) {
+            // Partial JSON or unrelated data, ignore
           }
         }
       }
-      // Ideally we trim the buffer, but for short chats, keeping it is ok-ish or just careful regex.
     }
-    
-    // Fallback: If streaming parsing failed to produce text (complex), we return accumulated.
-    // However, if we didn't parse anything, user sees empty bubble.
-    // Let's ensure we return at least the final response if possible, 
-    // but with `fetch` stream, we consume the body.
-    
     return accumulatedText || " ";
   } else {
-    // Non-streaming fallback
+    // Fallback if streaming fails to init (rare with alt=sse)
     const json = await response.json();
     return json.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
