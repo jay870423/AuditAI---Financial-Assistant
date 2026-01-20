@@ -8,7 +8,9 @@ const deepSeekApiKey = process.env.DEEPSEEK_API_KEY || '';
 const openAiApiKey = process.env.OPENAI_API_KEY || '';
 const qwenApiKey = process.env.DASHSCOPE_API_KEY || '';
 
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ 
+  apiKey
+});
 
 // Helper to convert Blob/File to Base64
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
@@ -134,6 +136,7 @@ const callOpenAICompatible = async (
 const getProviderConfig = (provider: ModelProvider, jsonMode: boolean = false): OpenAIConfig | null => {
   switch (provider) {
     case 'deepseek':
+      // DeepSeek supports China natively
       return {
         apiKey: deepSeekApiKey,
         baseUrl: "https://api.deepseek.com/chat/completions",
@@ -142,17 +145,19 @@ const getProviderConfig = (provider: ModelProvider, jsonMode: boolean = false): 
         jsonMode
       };
     case 'gpt':
+      // Use Proxy URL if set, otherwise default. Use Vercel rewrite /openai-api if env not set but in browser.
+      const gptBase = process.env.OPENAI_BASE_URL || (typeof window !== 'undefined' ? '/openai-api/v1/chat/completions' : "https://api.openai.com/v1/chat/completions");
       return {
         apiKey: openAiApiKey,
-        baseUrl: "https://api.openai.com/v1/chat/completions",
+        baseUrl: gptBase,
         model: "gpt-4o",
         providerName: "OpenAI (GPT-4o)",
         jsonMode
       };
     case 'qwen':
+      // Qwen (Aliyun) supports China natively
       return {
         apiKey: qwenApiKey,
-        // Using Alibaba DashScope OpenAI-compatible endpoint
         baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
         model: "qwen-max", // Or qwen-plus
         providerName: "Qwen (DashScope)",

@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
       'process.env.DEEPSEEK_API_KEY': JSON.stringify(env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY),
       'process.env.OPENAI_API_KEY': JSON.stringify(env.OPENAI_API_KEY || process.env.OPENAI_API_KEY),
       'process.env.DASHSCOPE_API_KEY': JSON.stringify(env.DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
+      
+      // Base URLs for Proxies (Optional override, defaults will be set in code if missing)
+      'process.env.GEMINI_BASE_URL': JSON.stringify(env.GEMINI_BASE_URL || process.env.GEMINI_BASE_URL),
+      'process.env.OPENAI_BASE_URL': JSON.stringify(env.OPENAI_BASE_URL || process.env.OPENAI_BASE_URL),
+
       'process.env.NEXT_PUBLIC_SUPABASE_URL': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
       'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
       'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
