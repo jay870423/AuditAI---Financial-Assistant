@@ -8,9 +8,16 @@ const deepSeekApiKey = process.env.DEEPSEEK_API_KEY || '';
 const openAiApiKey = process.env.OPENAI_API_KEY || '';
 const qwenApiKey = process.env.DASHSCOPE_API_KEY || '';
 
+// Determine Base URL for Gemini
+// Critical for China access: Use '/gemini-api' (Vercel Rewrite) when running in browser.
+// The SDK will append /v1beta/models/... to this base.
+const geminiBaseUrl = process.env.GEMINI_BASE_URL || (typeof window !== 'undefined' ? '/gemini-api' : undefined);
+
+// Initialize the SDK with the proxy baseUrl
 const ai = new GoogleGenAI({ 
-  apiKey
-});
+  apiKey,
+  baseUrl: geminiBaseUrl
+} as any); // Type cast to 'any' to avoid TS errors if the type definition is strict, though the SDK supports it.
 
 // Helper to convert Blob/File to Base64
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
