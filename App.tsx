@@ -290,6 +290,10 @@ const MainApp: React.FC = () => {
                 {t('dashboard.welcomeText')}
               </p>
             </div>
+
+            <div className="mt-8 text-center text-slate-400 text-sm py-4">
+              {t('footer.copyright')}
+            </div>
           </div>
         );
     }

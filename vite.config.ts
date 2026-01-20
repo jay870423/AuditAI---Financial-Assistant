@@ -8,6 +8,21 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    server: {
+      // Proxy configuration for local development to bypass GFW
+      proxy: {
+        '/gemini-api': {
+          target: 'https://generativelanguage.googleapis.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/gemini-api/, ''),
+        },
+        '/openai-api': {
+          target: 'https://api.openai.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/openai-api/, ''),
+        },
+      }
+    },
     define: {
       // Manually define process.env to allow usage in client-side code without changing source files.
       // We use (env.KEY || process.env.KEY) to ensure we catch variables from both .env files (local)

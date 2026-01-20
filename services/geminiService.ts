@@ -9,15 +9,17 @@ const openAiApiKey = process.env.OPENAI_API_KEY || '';
 const qwenApiKey = process.env.DASHSCOPE_API_KEY || '';
 
 // Determine Base URL for Gemini
-// Critical for China access: Use '/gemini-api' (Vercel Rewrite) when running in browser.
-// The SDK will append /v1beta/models/... to this base.
-const geminiBaseUrl = process.env.GEMINI_BASE_URL || (typeof window !== 'undefined' ? '/gemini-api' : undefined);
+// Critical for China access: Use absolute path to the proxy.
+// Local Dev: localhost:5173/gemini-api -> (Vite Proxy) -> googleapis.com
+// Production: yourdomain.com/gemini-api -> (Vercel Rewrite) -> googleapis.com
+const geminiBaseUrl = process.env.GEMINI_BASE_URL || (typeof window !== 'undefined' ? `${window.location.origin}/gemini-api` : undefined);
 
 // Initialize the SDK with the proxy baseUrl
+// We use 'any' cast because the SDK types for baseUrl can be strict, but it supports full URLs.
 const ai = new GoogleGenAI({ 
   apiKey,
   baseUrl: geminiBaseUrl
-} as any); // Type cast to 'any' to avoid TS errors if the type definition is strict, though the SDK supports it.
+} as any);
 
 // Helper to convert Blob/File to Base64
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
@@ -153,7 +155,7 @@ const getProviderConfig = (provider: ModelProvider, jsonMode: boolean = false): 
       };
     case 'gpt':
       // Use Proxy URL if set, otherwise default. Use Vercel rewrite /openai-api if env not set but in browser.
-      const gptBase = process.env.OPENAI_BASE_URL || (typeof window !== 'undefined' ? '/openai-api/v1/chat/completions' : "https://api.openai.com/v1/chat/completions");
+      const gptBase = process.env.OPENAI_BASE_URL || (typeof window !== 'undefined' ? `${window.location.origin}/openai-api/v1/chat/completions` : "https://api.openai.com/v1/chat/completions");
       return {
         apiKey: openAiApiKey,
         baseUrl: gptBase,
