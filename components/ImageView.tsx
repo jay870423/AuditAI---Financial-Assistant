@@ -17,6 +17,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [analysisText, setAnalysisText] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [scenario, setScenario] = useState<AuditScenario>('general');
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +37,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
   const processFile = (file: File) => {
     setSelectedFile(file);
     setAnalysisText('');
+    setErrorMessage('');
     setStatus(ProcessingStatus.IDLE);
 
     // Handle preview based on file type
@@ -50,6 +52,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
     setSelectedFile(null);
     setPreviewUrl(null);
     setAnalysisText('');
+    setErrorMessage('');
     setStatus(ProcessingStatus.IDLE);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -128,13 +131,15 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
     // Login check removed to allow public access
     if (!selectedFile) return;
     setStatus(ProcessingStatus.PROCESSING);
+    setErrorMessage('');
     try {
       const text = await analyzeReceiptImage(selectedFile, modelProvider, language, scenario);
       setAnalysisText(text);
       setStatus(ProcessingStatus.SUCCESS);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       setStatus(ProcessingStatus.ERROR);
+      setErrorMessage(e.message || t('imageView.error'));
     }
   };
 
@@ -328,7 +333,7 @@ const ImageView: React.FC<ImageViewProps> = ({ session, onRequireLogin, modelPro
             {status === ProcessingStatus.ERROR && (
               <div className="p-4 bg-red-50 text-red-700 rounded-xl flex items-center gap-3 print:hidden">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" /> 
-                <span className="text-sm font-medium">{t('imageView.error')}</span>
+                <span className="text-sm font-medium">{errorMessage}</span>
               </div>
             )}
 

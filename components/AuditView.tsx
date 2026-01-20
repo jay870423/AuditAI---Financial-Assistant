@@ -19,6 +19,7 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [result, setResult] = useState<AuditAnalysisResult | null>(null);
   const [scenario, setScenario] = useState<AuditScenario>('general');
+  const [errorMessage, setErrorMessage] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,13 +28,16 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
     if (!inputText.trim()) return;
     setStatus(ProcessingStatus.PROCESSING);
     setResult(null);
+    setErrorMessage('');
+    
     try {
       const data = await analyzeFinancialData(inputText, modelProvider, language, scenario);
       setResult(data);
       setStatus(ProcessingStatus.SUCCESS);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       setStatus(ProcessingStatus.ERROR);
+      setErrorMessage(e.message || t('auditView.error'));
     }
   };
 
@@ -208,9 +212,9 @@ const AuditView: React.FC<AuditViewProps> = ({ session, onRequireLogin, modelPro
       </div>
 
       {status === ProcessingStatus.ERROR && (
-        <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center gap-2">
+        <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center gap-2 animate-fade-in">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">{t('auditView.error')}</span>
+          <span className="text-sm font-medium">{errorMessage}</span>
         </div>
       )}
 

@@ -24,8 +24,6 @@ Go to **Settings** -> **Environment Variables** in your Vercel project and add t
 | `DEEPSEEK_API_KEY` | DeepSeek API Key (Optional) | No |
 | `OPENAI_API_KEY` | OpenAI API Key (Optional) | No |
 
-*Note: The app is pre-configured with `vercel.json` to proxy API requests via `/gemini-api` and `/openai-api`, so no extra code changes are needed for the proxy to work.*
-
 ### 3. 🇨🇳 Critical Configuration for China
 The default `*.vercel.app` domains are often blocked or have DNS issues in China. To ensure the app works reliably:
 
@@ -33,15 +31,13 @@ The default `*.vercel.app` domains are often blocked or have DNS issues in China
 2.  Add your own domain (e.g., `audit.yourcompany.com`).
 3.  Configure the CNAME record in your DNS provider (Aliyun, Tencent Cloud, Cloudflare, etc.) to point to `cname.vercel-dns.com`.
 
-Once accessed via your custom domain, the Vercel Rewrites will successfully proxy the Gemini API traffic through Vercel's global edge network.
-
 ## Local Development
 
 1.  Install dependencies:
     ```bash
     npm install
     ```
-2.  Create a `.env.local` file:
+2.  Create a `.env.local` file. **IMPORTANT**: Do not commit this file to GitHub!
     ```env
     API_KEY=your_gemini_key
     NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -51,6 +47,16 @@ Once accessed via your custom domain, the Vercel Rewrites will successfully prox
     ```bash
     npm run dev
     ```
+
+## ⚠️ Troubleshooting: "API Key Leaked" Error
+
+If you see an error saying **"Your API key was reported as leaked"**, it means Google has detected your key in a public place (like a GitHub repo or a chat log) and **permanently revoked it**.
+
+**Solution:**
+1.  Go to [Google AI Studio](https://aistudio.google.com/) and create a **NEW** API Key.
+2.  Update your `.env.local` file with the new key.
+3.  **Restart your local server** (`Ctrl+C` then `npm run dev`) for the change to take effect.
+4.  Update the Environment Variable in Vercel settings and **Redeploy**.
 
 ## Features
 *   **Financial Analysis**: Upload CSV/Excel to detect fraud, tax issues, and compliance risks.

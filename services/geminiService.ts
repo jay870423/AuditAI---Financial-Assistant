@@ -7,16 +7,83 @@ const deepSeekApiKey = process.env.DEEPSEEK_API_KEY || '';
 const openAiApiKey = process.env.OPENAI_API_KEY || '';
 const qwenApiKey = process.env.DASHSCOPE_API_KEY || '';
 
+// Known leaked key from previous error logs
+const KNOWN_LEAKED_KEY = 'AIzaSyC5rjCmri6zIsyZYASSBso7tCGl0PBD-N8';
+
+// --- DEBUG & SECURITY CHECK ---
+if (typeof window !== 'undefined') {
+  // Safe mask: Show first 4 and last 4 chars
+  const maskedKey = apiKey && apiKey.length > 10 
+    ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` 
+    : (apiKey ? 'SHORT_KEY' : 'MISSING');
+    
+  console.log(`%c[AuditAI] Config Loaded`, 'background: #4f46e5; color: white; padding: 2px 5px; border-radius: 3px;');
+  console.log(`Current Loaded API Key: ${maskedKey}`);
+  
+  if (apiKey === KNOWN_LEAKED_KEY) {
+    console.error(
+      "%c🚨 FATAL ERROR: OLD KEY DETECTED IN MEMORY 🚨", 
+      "background: red; color: white; font-size: 16px; padding: 10px;"
+    );
+    console.error("You updated .env.local, BUT the server is still using the old key.");
+    console.error("👉 ACTION REQUIRED: Go to your terminal, press Ctrl+C, and run 'npm run dev' again.");
+  }
+}
+
 // --- PROXY CONFIGURATION ---
 const GEMINI_PROXY_BASE = '/gemini-api';
 const GEMINI_API_VERSION = 'v1beta';
 
+// Helper: Handle API Errors gracefully
+const handleApiError = async (response: Response, provider: string) => {
+  const status = response.status;
+  let errorText = '';
+  try {
+    errorText = await response.text();
+  } catch (e) {
+    errorText = 'Unknown error';
+  }
+
+  // Detect if the OLD key is still active when an error occurs
+  if (apiKey === KNOWN_LEAKED_KEY) {
+    throw new Error("⚠️ RESTART REQUIRED: The app is still using the old revoked key. Please stop and restart 'npm run dev'.");
+  }
+
+  // Try to parse JSON error from Google/OpenAI
+  let friendlyMessage = `Error (${status})`;
+  try {
+    const json = JSON.parse(errorText);
+    // Google format: { error: { message: "..." } }
+    if (json.error && json.error.message) {
+      friendlyMessage = json.error.message;
+    } 
+    // OpenAI format: { error: { message: "..." } }
+    else if (json.error && typeof json.error === 'string') {
+      friendlyMessage = json.error;
+    }
+  } catch (e) {
+    if (errorText.length < 100) friendlyMessage = errorText;
+  }
+
+  // Specific check for Leaked Key
+  if (status === 403 || status === 400) {
+    if (friendlyMessage.toLowerCase().includes('leaked') || friendlyMessage.includes('API key not valid')) {
+      throw new Error("🚨 API Key Invalid. If you just updated .env.local, please RESTART your terminal (Ctrl+C -> npm run dev).");
+    }
+  }
+  
+  if (status === 404) {
+    throw new Error("Model unreachable (404). If locally in China, ensure you have a VPN enabled for the terminal/browser.");
+  }
+
+  throw new Error(`${provider} API Error: ${friendlyMessage}`);
+};
+
 // Helper: Get full Gemini URL via Proxy
-// Added 'sse' support for chat streaming
 const getGeminiUrl = (model: string, method: string, isStreaming: boolean = false): string => {
   let url = `${GEMINI_PROXY_BASE}/${GEMINI_API_VERSION}/models/${model}:${method}?key=${apiKey}`;
   if (isStreaming) {
-    url += '&alt=sse'; // Use Server-Sent Events for reliable streaming
+    url += '&alt=sse'; 
   }
   return url;
 };
@@ -90,9 +157,7 @@ const callOpenAICompatible = async (
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[AuditAI] ${config.providerName} Error:`, errorText);
-    throw new Error(`${config.providerName} Error (${response.status}): ${errorText}`);
+    await handleApiError(response, config.providerName);
   }
 
   if (isStreaming && onChunk && response.body) {
@@ -153,6 +218,11 @@ const getScenarioInstruction = (scenario: AuditScenario, langInstruction: string
 };
 
 export const analyzeFinancialData = async (data: string, provider: ModelProvider = 'gemini', language: Language = 'en', scenario: AuditScenario = 'general'): Promise<AuditAnalysisResult> => {
+  // Explicit restart check
+  if (apiKey === KNOWN_LEAKED_KEY) {
+    throw new Error("⚠️ SERVER RESTART REQUIRED: Old Key detected. Stop terminal and run 'npm run dev' again.");
+  }
+
   const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
   const systemInstruction = getScenarioInstruction(scenario, langInstruction);
   
@@ -172,14 +242,12 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
     }
   `;
 
-  // 1. OpenAI Compatible
   const config = getProviderConfig(provider, true);
   if (config) {
     const res = await callOpenAICompatible([{ role: "user", content: promptText }], systemInstruction, config);
     return JSON.parse(res.replace(/```json\n?|\n?```/g, ''));
   }
 
-  // 2. Gemini
   if (!apiKey) throw new Error("Gemini API Key is missing.");
 
   const model = "gemini-3-flash-preview";
@@ -237,9 +305,7 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    console.error("[AuditAI] Gemini API Error:", errText);
-    throw new Error(`Gemini Error (${response.status}): ${errText}`);
+    await handleApiError(response, 'Gemini');
   }
 
   const json = await response.json();
@@ -253,7 +319,6 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
   const langInstruction = language === 'zh' ? 'Simplified Chinese (zh-CN)' : 'English';
   const prompt = `Perform a forensic audit on this image. Scenario: ${scenario}. Language: ${langInstruction}. Format as Markdown.`;
 
-  // 1. OpenAI Compatible
   if (provider === 'gpt' || provider === 'qwen') {
     const config = getProviderConfig(provider);
     if (config) {
@@ -264,7 +329,6 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
     }
   }
 
-  // 2. Gemini
   if (!apiKey) throw new Error("Gemini API Key missing.");
   
   const model = "gemini-3-flash-preview"; 
@@ -290,9 +354,7 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    console.error("[AuditAI] Gemini Vision Error:", errText);
-    throw new Error(`Gemini Vision Error (${response.status}): ${errText}`);
+    await handleApiError(response, 'Gemini Vision');
   }
 
   const json = await response.json();
@@ -310,7 +372,6 @@ export const sendChatMessage = async (
     ? `你是一名专业的财务审计顾问 (AuditAI)。请根据会计准则回答，保持专业。` 
     : `You are a professional financial audit consultant (AuditAI). Answer based on accounting standards.`;
 
-  // 1. OpenAI Compatible
   const config = getProviderConfig(provider);
   if (config) {
     const messages = history.map(msg => ({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.text }));
@@ -318,11 +379,14 @@ export const sendChatMessage = async (
     return await callOpenAICompatible(messages, systemInstruction, config, onChunk);
   }
 
-  // 2. Gemini (SSE Streaming)
   if (!apiKey) throw new Error("Gemini API Key is missing.");
   
+  // Check for old key again just in case
+  if (apiKey === KNOWN_LEAKED_KEY) {
+    throw new Error("⚠️ RESTART SERVER: Old API Key detected.");
+  }
+
   const model = "gemini-3-flash-preview";
-  // CRITICAL: Use alt=sse for robust streaming
   const url = getGeminiUrl(model, "streamGenerateContent", true);
 
   console.log(`[AuditAI] Requesting Gemini Chat (SSE): ${url}`);
@@ -345,12 +409,9 @@ export const sendChatMessage = async (
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    console.error("[AuditAI] Gemini Chat Error:", errText);
-    throw new Error(`Gemini Chat Error (${response.status}): ${errText}`);
+    await handleApiError(response, 'Gemini Chat');
   }
 
-  // Handle SSE Streaming (Robust)
   if (onChunk && response.body) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
@@ -375,15 +436,12 @@ export const sendChatMessage = async (
               accumulatedText += text;
               onChunk(accumulatedText);
             }
-          } catch (e) {
-            // Partial JSON or unrelated data, ignore
-          }
+          } catch (e) { }
         }
       }
     }
     return accumulatedText || " ";
   } else {
-    // Fallback if streaming fails to init (rare with alt=sse)
     const json = await response.json();
     return json.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }

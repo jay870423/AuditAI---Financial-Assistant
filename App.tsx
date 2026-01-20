@@ -166,14 +166,15 @@ const MainApp: React.FC = () => {
           });
         }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      // Optional: Update message to show error
+      // Show exact error message to user (e.g. "Key Leaked", "Rate Limit")
       setChatHistory(prev => {
         const newHistory = [...prev];
         const msgIndex = newHistory.findIndex(m => m.id === botMsgId);
         if (msgIndex !== -1) {
-          newHistory[msgIndex] = { ...newHistory[msgIndex], text: "Sorry, something went wrong." };
+          const errMsg = error.message || "Sorry, an unexpected error occurred.";
+          newHistory[msgIndex] = { ...newHistory[msgIndex], text: `**System Error:** ${errMsg}` };
         }
         return newHistory;
       });

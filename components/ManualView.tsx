@@ -16,11 +16,20 @@ import {
   FileSpreadsheet,
   ScanLine,
   Search,
-  Zap
+  Zap,
+  Key
 } from 'lucide-react';
 
 const ManualView: React.FC = () => {
   const { language, t } = useLanguage();
+
+  // Debugging Info for Key
+  const rawKey = process.env.API_KEY || '';
+  const displayKey = rawKey.length > 8 
+    ? `${rawKey.slice(0, 5)}...${rawKey.slice(-5)}` 
+    : (rawKey ? 'Invalid/Short' : 'Not Loaded');
+  
+  const isOldKey = rawKey === 'AIzaSyC5rjCmri6zIsyZYASSBso7tCGl0PBD-N8';
 
   const content = {
     en: {
@@ -183,6 +192,28 @@ const ManualView: React.FC = () => {
     <div className="animate-fade-in pb-12">
       <div className="max-w-5xl mx-auto space-y-8 md:space-y-12">
         
+        {/* Debug Info Banner */}
+        <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isOldKey ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+          <div className="flex items-center gap-3">
+            <Key className={`w-5 h-5 ${isOldKey ? 'text-red-500' : 'text-slate-400'}`} />
+            <div>
+              <div className="font-bold text-sm uppercase tracking-wider">System Environment Status</div>
+              <div className="font-mono text-sm mt-0.5">
+                Loaded Key: <span className="font-bold">{displayKey}</span>
+              </div>
+            </div>
+          </div>
+          {isOldKey ? (
+             <div className="text-xs md:text-sm font-bold bg-white px-3 py-1.5 rounded-lg border border-red-100 shadow-sm animate-pulse">
+               ⚠️ OLD KEY DETECTED! Restart Server (Ctrl+C &rarr; npm run dev)
+             </div>
+          ) : (
+             <div className="text-xs font-medium bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm text-emerald-600 flex items-center gap-1">
+               <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Config Loaded
+             </div>
+          )}
+        </div>
+
         {/* Hero Section */}
         <div className="bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden">
           {/* Decorative Background Elements */}
