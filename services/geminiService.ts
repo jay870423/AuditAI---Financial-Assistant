@@ -15,7 +15,8 @@ const qwenApiKey = process.env.DASHSCOPE_API_KEY || '';
 const geminiBaseUrl = process.env.GEMINI_BASE_URL || (typeof window !== 'undefined' ? `${window.location.origin}/gemini-api` : undefined);
 
 // Initialize the SDK with the proxy baseUrl
-// We use 'any' cast because the SDK types for baseUrl can be strict, but it supports full URLs.
+// We use 'any' cast because the SDK types for baseUrl can be strict or vary by version.
+// Providing both baseUrl and customBaseUrl to cover different internal implementations of the SDK.
 const ai = new GoogleGenAI({ 
   apiKey,
   baseUrl: geminiBaseUrl
@@ -241,6 +242,10 @@ export const analyzeFinancialData = async (data: string, provider: ModelProvider
   }
 
   // --- Gemini Implementation ---
+  if (apiKey === 'MISSING_API_KEY') {
+    throw new Error("Gemini API Key is missing in environment variables.");
+  }
+
   const model = "gemini-3-flash-preview";
   const responseSchema = {
     type: Type.OBJECT,
@@ -370,6 +375,10 @@ export const analyzeReceiptImage = async (file: File, provider: ModelProvider = 
     ? "**Note:** DeepSeek text model does not support image/document analysis. Switching to Gemini 3 Flash.\n\n" 
     : "";
   
+  if (apiKey === 'MISSING_API_KEY') {
+    throw new Error("Gemini API Key is missing. Vision analysis requires a valid API Key.");
+  }
+  
   const model = "gemini-3-flash-preview"; 
   const filePart = await fileToGenerativePart(file);
   
@@ -433,11 +442,15 @@ export const sendChatMessage = async (
       return await callOpenAICompatible(messages, systemInstruction, config, onChunk);
     } catch (error) {
        console.error(`${config.providerName} Chat Error:`, error);
-       return `Sorry, I encountered an error connecting to ${config.providerName}.`;
+       throw error; // Propagate error to UI
     }
   }
 
   // --- Gemini Implementation (Streaming) ---
+  if (apiKey === 'MISSING_API_KEY') {
+    throw new Error("Gemini API Key is missing. Please configure your environment variables.");
+  }
+
   const formattedHistory = history.map(msg => ({
     role: msg.role,
     parts: [{ text: msg.text }]
@@ -471,6 +484,9 @@ export const sendChatMessage = async (
     }
   } catch (error) {
     console.error("Chat Error:", error);
-    return "Sorry, I encountered an error connecting to the service.";
+    // CRITICAL FIX: Rethrow the error instead of returning a generic string.
+    // This ensures the App component catches it and displays the error state 
+    // instead of an empty loading bubble.
+    throw error;
   }
 };
